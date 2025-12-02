@@ -4,8 +4,11 @@ import type { TabId, EditorSnapshot } from "@/hooks/use-multi-document-state";
 const DB_NAME = "paperwork-db";
 const DB_VERSION = 1;
 const STORE_NAME = "sessions";
-const SESSION_KEY = "current-session";
-const LOCAL_STORAGE_MARKER = "paperwork-session-exists";
+
+// Helper to get localStorage key for a session
+function getSessionMarkerKey(sessionId: string): string {
+  return `paperwork-session-${sessionId}`;
+}
 
 // Persisted data structures
 export interface PersistedTab {
@@ -48,7 +51,7 @@ function openDatabase(): Promise<IDBDatabase> {
 }
 
 // Save session to IndexedDB
-export async function saveSession(session: PersistedSession): Promise<void> {
+export async function saveSession(sessionId: string, session: PersistedSession): Promise<void> {
   try {
     const db = await openDatabase();
 
@@ -56,7 +59,7 @@ export async function saveSession(session: PersistedSession): Promise<void> {
       const transaction = db.transaction(STORE_NAME, "readwrite");
       const store = transaction.objectStore(STORE_NAME);
 
-      const request = store.put(session, SESSION_KEY);
+      const request = store.put(session, sessionId);
 
       request.onerror = () => {
         reject(new Error("Failed to save session"));
@@ -65,7 +68,7 @@ export async function saveSession(session: PersistedSession): Promise<void> {
       request.onsuccess = () => {
         // Set localStorage marker for quick session detection
         try {
-          localStorage.setItem(LOCAL_STORAGE_MARKER, "true");
+          localStorage.setItem(getSessionMarkerKey(sessionId), "true");
         } catch {
           // localStorage might be unavailable, but we can continue
         }
@@ -83,7 +86,7 @@ export async function saveSession(session: PersistedSession): Promise<void> {
 }
 
 // Load session from IndexedDB
-export async function loadSession(): Promise<PersistedSession | null> {
+export async function loadSession(sessionId: string): Promise<PersistedSession | null> {
   try {
     const db = await openDatabase();
 
@@ -91,7 +94,7 @@ export async function loadSession(): Promise<PersistedSession | null> {
       const transaction = db.transaction(STORE_NAME, "readonly");
       const store = transaction.objectStore(STORE_NAME);
 
-      const request = store.get(SESSION_KEY);
+      const request = store.get(sessionId);
 
       request.onerror = () => {
         reject(new Error("Failed to load session"));
@@ -112,7 +115,7 @@ export async function loadSession(): Promise<PersistedSession | null> {
           !Array.isArray(data.tabOrder)
         ) {
           console.warn("Invalid session structure, clearing");
-          clearSession().then(() => resolve(null));
+          clearSession(sessionId).then(() => resolve(null));
           return;
         }
 
@@ -128,7 +131,7 @@ export async function loadSession(): Promise<PersistedSession | null> {
         });
 
         if (validTabs.length === 0) {
-          clearSession().then(() => resolve(null));
+          clearSession(sessionId).then(() => resolve(null));
           return;
         }
 
@@ -156,17 +159,17 @@ export async function loadSession(): Promise<PersistedSession | null> {
   } catch (error) {
     console.error("Failed to load session:", error);
     // Clear potentially corrupted data
-    await clearSession();
+    await clearSession(sessionId);
     return null;
   }
 }
 
-// Clear all stored session data
-export async function clearSession(): Promise<void> {
+// Clear stored session data for a specific session
+export async function clearSession(sessionId: string): Promise<void> {
   try {
     // Clear localStorage marker
     try {
-      localStorage.removeItem(LOCAL_STORAGE_MARKER);
+      localStorage.removeItem(getSessionMarkerKey(sessionId));
     } catch {
       // Ignore localStorage errors
     }
@@ -177,7 +180,7 @@ export async function clearSession(): Promise<void> {
       const transaction = db.transaction(STORE_NAME, "readwrite");
       const store = transaction.objectStore(STORE_NAME);
 
-      const request = store.delete(SESSION_KEY);
+      const request = store.delete(sessionId);
 
       request.onerror = () => {
         reject(new Error("Failed to clear session"));
@@ -198,9 +201,9 @@ export async function clearSession(): Promise<void> {
 }
 
 // Quick check if a persisted session exists (uses localStorage for speed)
-export function hasPersistedSession(): boolean {
+export function hasPersistedSession(sessionId: string): boolean {
   try {
-    return localStorage.getItem(LOCAL_STORAGE_MARKER) === "true";
+    return localStorage.getItem(getSessionMarkerKey(sessionId)) === "true";
   } catch {
     // localStorage unavailable, need to check IndexedDB
     return false;

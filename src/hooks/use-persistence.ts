@@ -18,6 +18,7 @@ interface UsePersistenceReturn {
 }
 
 export function usePersistence(
+  sessionId: string,
   multiDocState: MultiDocumentState,
   formValuesRef: React.RefObject<Map<TabId, Record<string, string | boolean>>>,
   options: UsePersistenceOptions = {}
@@ -60,18 +61,18 @@ export function usePersistence(
 
       // Don't save empty sessions
       if (session.tabs.length === 0) {
-        await clearSession();
+        await clearSession(sessionId);
         return;
       }
 
-      await saveSession(session);
+      await saveSession(sessionId, session);
       setLastSaved(new Date());
     } catch (error) {
       console.error("Failed to save session:", error);
     } finally {
       isSavingRef.current = false;
     }
-  }, [buildSession]);
+  }, [buildSession, sessionId]);
 
   // Debounced save scheduler
   const scheduleSave = useCallback(() => {
@@ -109,9 +110,9 @@ export function usePersistence(
         clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = null;
       }
-      clearSession();
+      clearSession(sessionId);
     }
-  }, [multiDocState.orderedTabs.length]);
+  }, [multiDocState.orderedTabs.length, sessionId]);
 
   // Save on beforeunload (best-effort synchronous save marker)
   const tabCount = multiDocState.orderedTabs.length;
@@ -148,9 +149,14 @@ export function usePersistence(
     await performSave();
   }, [performSave]);
 
+  // Wrap clearSession with sessionId
+  const clearSaved = useCallback(async () => {
+    await clearSession(sessionId);
+  }, [sessionId]);
+
   return {
     lastSaved,
     saveNow,
-    clearSaved: clearSession,
+    clearSaved,
   };
 }

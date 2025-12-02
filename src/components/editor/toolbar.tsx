@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import {
   MousePointer2,
   Type,
@@ -35,6 +36,7 @@ interface ToolbarProps {
   canRedo: boolean;
   hasRedactions: boolean;
   hasTabBar?: boolean;
+  isEntering?: boolean;
   onUndo: () => void;
   onRedo: () => void;
   onZoomIn: () => void;
@@ -53,6 +55,7 @@ export function Toolbar({
   canRedo,
   hasRedactions,
   hasTabBar = false,
+  isEntering = false,
   onUndo,
   onRedo,
   onZoomIn,
@@ -72,11 +75,19 @@ export function Toolbar({
 
   return (
     <TooltipProvider delayDuration={400}>
-      <div
+      <motion.div
         className={cn(
           "sticky z-[70] flex justify-center pointer-events-none",
           hasTabBar ? "top-12" : "top-4"
         )}
+        initial={isEntering ? { opacity: 0, y: -20 } : false}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{
+          type: "spring",
+          stiffness: 300,
+          damping: 25,
+          delay: isEntering ? 0.15 : 0,
+        }}
       >
         <div className="pointer-events-auto flex items-center gap-0.5 bg-popover/90 backdrop-blur-md rounded-full shadow-lg shadow-foreground/10 border border-border/60 px-1.5 py-1.5">
           {/* Edit tools */}
@@ -191,11 +202,18 @@ export function Toolbar({
                     </div>
                   ) : (
                     /* Flatten toggle only shown when no redactions */
-                    <button
-                      type="button"
+                    <div
+                      role="button"
+                      tabIndex={0}
                       onClick={() => setSecureDownload(!secureDownload)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setSecureDownload(!secureDownload);
+                        }
+                      }}
                       className={cn(
-                        "flex items-center justify-between gap-3 w-full px-3 py-2.5 rounded-xl text-left transition-colors",
+                        "flex items-center justify-between gap-3 w-full px-3 py-2.5 rounded-xl text-left transition-colors cursor-pointer",
                         secureDownload ? "bg-muted" : "hover:bg-accent"
                       )}
                     >
@@ -219,7 +237,7 @@ export function Toolbar({
                         onCheckedChange={setSecureDownload}
                         onClick={(e) => e.stopPropagation()}
                       />
-                    </button>
+                    </div>
                   )}
 
                   {/* Primary download button */}
@@ -250,7 +268,7 @@ export function Toolbar({
             </TooltipContent>
           </Tooltip>
         </div>
-      </div>
+      </motion.div>
     </TooltipProvider>
   );
 }

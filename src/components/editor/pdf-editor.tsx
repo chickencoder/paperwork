@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useCallback, useRef, useState } from "react";
+import { motion } from "framer-motion";
 import { useEditorState, type EditorSnapshot } from "@/hooks/use-editor-state";
 import { useTextSelection } from "@/hooks/use-text-selection";
 import { useZoom } from "@/hooks/use-zoom";
@@ -12,6 +13,7 @@ import { PDFViewer, type PDFViewerHandle } from "./pdf-viewer";
 import { Toolbar } from "./toolbar";
 import { SelectionToolbar } from "./selection-toolbar";
 import { ScrollProgress } from "./scroll-progress";
+import type { TransitionState } from "@/components/landing/landing-dialog";
 
 interface PDFEditorProps {
   file: File;
@@ -20,6 +22,9 @@ interface PDFEditorProps {
   onStateChange?: (snapshot: EditorSnapshot, isDirty: boolean) => void;
   onFormValuesChange?: (values: Record<string, string | boolean>) => void;
   hasTabBar?: boolean;
+  isEntering?: boolean;
+  entryRect?: TransitionState["dialogRect"];
+  onEnterComplete?: () => void;
 }
 
 export function PDFEditor({
@@ -29,6 +34,9 @@ export function PDFEditor({
   onStateChange,
   onFormValuesChange,
   hasTabBar = false,
+  isEntering = false,
+  entryRect,
+  onEnterComplete,
 }: PDFEditorProps) {
   const {
     state,
@@ -472,13 +480,7 @@ export function PDFEditor({
   const hasRedactions = state.redactionAnnotations.some(r => r.enabled);
 
   if (!state.pdfFile) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-pulse text-muted-foreground font-body">
-          Loading document...
-        </div>
-      </div>
-    );
+    return <div className="min-h-screen bg-muted" />;
   }
 
   return (
@@ -498,6 +500,7 @@ export function PDFEditor({
         canRedo={canRedo}
         hasRedactions={hasRedactions}
         hasTabBar={hasTabBar}
+        isEntering={isEntering}
         onUndo={handleUndo}
         onRedo={handleRedo}
         onZoomIn={zoomIn}
@@ -508,7 +511,26 @@ export function PDFEditor({
         onDownload={handleDownload}
       />
 
-      <div className="px-4 pt-4 pb-8">
+      <motion.div
+        className="px-4 pt-4 pb-8"
+        initial={
+          isEntering && entryRect
+            ? { opacity: 0, scale: 0.95 }
+            : false
+        }
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{
+          type: "spring",
+          stiffness: 300,
+          damping: 25,
+          delay: isEntering ? 0.05 : 0,
+        }}
+        onAnimationComplete={() => {
+          if (isEntering) {
+            onEnterComplete?.();
+          }
+        }}
+      >
         <PDFViewer
           ref={viewerRef}
           file={file}
@@ -538,7 +560,7 @@ export function PDFEditor({
           onDocumentLoad={setTotalPages}
           onCurrentPageChange={setCurrentPage}
         />
-      </div>
+      </motion.div>
 
       {/* Floating toolbar for text selection */}
       {selection && (

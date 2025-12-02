@@ -22,6 +22,7 @@ import {
 } from "@/lib/storage/persistence";
 import { mergePDFs } from "@/lib/pdf/pdf-merger";
 import type { EditorSnapshot } from "@/hooks/use-editor-state";
+import type { TransitionState } from "@/components/landing/landing-dialog";
 
 // App state machine for restore flow
 type AppState =
@@ -30,15 +31,23 @@ type AppState =
   | { status: "ready"; initialState?: InitialPersistedState };
 
 function EditorContent({
+  sessionId,
   initialState,
   initialFormValues,
   pendingPdf,
   onPendingPdfHandled,
+  isEntering,
+  entryRect,
+  onEnterComplete,
 }: {
+  sessionId: string;
   initialState?: InitialPersistedState;
   initialFormValues?: Map<TabId, Record<string, string | boolean>>;
   pendingPdf?: { name: string; bytes: Uint8Array } | null;
   onPendingPdfHandled?: () => void;
+  isEntering?: boolean;
+  entryRect?: TransitionState["dialogRect"];
+  onEnterComplete?: () => void;
 }) {
   const multiDocState = useMultiDocumentState(initialState);
   const {
@@ -58,7 +67,7 @@ function EditorContent({
   );
 
   // Integrate persistence
-  usePersistence(multiDocState, formValuesRef);
+  usePersistence(sessionId, multiDocState, formValuesRef);
 
   // Dialog states
   const [addFileDialogOpen, setAddFileDialogOpen] = useState(false);
@@ -267,11 +276,7 @@ function EditorContent({
   }, [orderedTabs.length, pendingPdf, router]);
 
   if (orderedTabs.length === 0) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-muted">
-        <div className="animate-pulse text-muted-foreground">Loading...</div>
-      </div>
-    );
+    return <div className="min-h-screen bg-muted" />;
   }
 
   // Has tabs: show editor with tab bar (only when multiple tabs)
@@ -297,6 +302,9 @@ function EditorContent({
           onStateChange={handleEditorStateChange}
           onFormValuesChange={handleFormValuesChange}
           hasTabBar={orderedTabs.length > 1}
+          isEntering={isEntering}
+          entryRect={entryRect}
+          onEnterComplete={onEnterComplete}
         />
       )}
 
@@ -341,7 +349,7 @@ function EditorContent({
 }
 
 // Main Editor App component with restore flow
-export default function EditorApp() {
+export default function EditorApp({ sessionId }: { sessionId: string }) {
   const [appState, setAppState] = useState<AppState>({ status: "checking" });
   const [restoredFormValues, setRestoredFormValues] = useState<
     Map<TabId, Record<string, string | boolean>> | undefined
@@ -351,36 +359,61 @@ export default function EditorApp() {
     bytes: Uint8Array;
   } | null>(null);
 
-  // Check for pending PDF from landing page
-  useEffect(() => {
-    const pending = sessionStorage.getItem("pendingPdf");
-    if (pending) {
-      try {
-        const { name, bytes } = JSON.parse(pending);
-        setPendingPdf({
-          name,
-          bytes: new Uint8Array(bytes),
-        });
-        sessionStorage.removeItem("pendingPdf");
-      } catch (e) {
-        console.error("Failed to parse pending PDF:", e);
-        sessionStorage.removeItem("pendingPdf");
-      }
-    }
-  }, []);
+  // Transition animation state from homepage
+  const [isEntering, setIsEntering] = useState(false);
+  const [entryRect, setEntryRect] = useState<TransitionState["dialogRect"]>(null);
 
-  // Check for persisted session on mount
+  // Check for pending PDF and persisted session on mount
   useEffect(() => {
-    async function checkSession() {
-      try {
-        // If we have a pending PDF, skip restore dialog
-        if (pendingPdf) {
-          setAppState({ status: "ready" });
-          return;
+    async function initialize() {
+      // First, check for pending PDF from landing page
+      let hasPendingPdf = false;
+      const pending = sessionStorage.getItem("pendingPdf");
+      if (pending) {
+        try {
+          const { name, bytes } = JSON.parse(pending);
+          setPendingPdf({
+            name,
+            bytes: new Uint8Array(bytes),
+          });
+          sessionStorage.removeItem("pendingPdf");
+          hasPendingPdf = true;
+        } catch (e) {
+          console.error("Failed to parse pending PDF:", e);
+          sessionStorage.removeItem("pendingPdf");
         }
+      }
 
-        if (hasPersistedSession()) {
-          const session = await loadSession();
+      // Check for transition state from homepage
+      const transitionStateStr = sessionStorage.getItem("transitionState");
+      if (transitionStateStr) {
+        try {
+          const transitionState: TransitionState = JSON.parse(transitionStateStr);
+          // Only use if fresh (within last 2 seconds) and from homepage
+          if (
+            transitionState.fromHomepage &&
+            Date.now() - transitionState.timestamp < 2000
+          ) {
+            setIsEntering(true);
+            setEntryRect(transitionState.dialogRect);
+          }
+        } catch (e) {
+          console.error("Failed to parse transition state:", e);
+        }
+        sessionStorage.removeItem("transitionState");
+      }
+
+      // If we have a pending PDF, skip restore dialog (it's a new session)
+      if (hasPendingPdf) {
+        setRestoredFormValues(undefined);
+        setAppState({ status: "ready" });
+        return;
+      }
+
+      // Otherwise, check for persisted session with this sessionId
+      try {
+        if (hasPersistedSession(sessionId)) {
+          const session = await loadSession(sessionId);
           if (session && session.tabs.length > 0) {
             // Store form values for later injection
             const formValues = new Map<
@@ -402,12 +435,12 @@ export default function EditorApp() {
         }
       } catch (error) {
         console.error("Failed to check session:", error);
-        await clearSession();
+        await clearSession(sessionId);
         setAppState({ status: "ready" });
       }
     }
-    checkSession();
-  }, [pendingPdf]);
+    initialize();
+  }, [sessionId]);
 
   // Handle restore confirmation
   const handleRestore = useCallback(() => {
@@ -431,23 +464,25 @@ export default function EditorApp() {
 
   // Handle start fresh
   const handleStartFresh = useCallback(async () => {
-    await clearSession();
+    await clearSession(sessionId);
     setRestoredFormValues(undefined);
     setAppState({ status: "ready" });
-  }, []);
+  }, [sessionId]);
 
   // Handle pending PDF consumed
   const handlePendingPdfHandled = useCallback(() => {
     setPendingPdf(null);
   }, []);
 
+  // Handle enter animation complete
+  const handleEnterComplete = useCallback(() => {
+    setIsEntering(false);
+    setEntryRect(null);
+  }, []);
+
   // Show loading state while checking
   if (appState.status === "checking") {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-muted">
-        <div className="animate-pulse text-muted-foreground">Loading...</div>
-      </div>
-    );
+    return <div className="min-h-screen bg-muted" />;
   }
 
   // Show restore dialog with restored session visible in background
@@ -469,6 +504,7 @@ export default function EditorApp() {
       <>
         <div className="pointer-events-none">
           <EditorContent
+            sessionId={sessionId}
             initialState={previewState}
             initialFormValues={restoredFormValues}
           />
@@ -486,10 +522,14 @@ export default function EditorApp() {
   // Ready state - render the app
   return (
     <EditorContent
+      sessionId={sessionId}
       initialState={appState.initialState}
       initialFormValues={appState.initialState ? restoredFormValues : undefined}
       pendingPdf={pendingPdf}
       onPendingPdfHandled={handlePendingPdfHandled}
+      isEntering={isEntering}
+      entryRect={entryRect}
+      onEnterComplete={handleEnterComplete}
     />
   );
 }
