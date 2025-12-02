@@ -20,13 +20,49 @@ export interface FormField {
   groupName?: string; // For radio buttons
 }
 
+// Text annotation color palette - organized by color family
+export type TextAnnotationColor =
+  // Grayscale
+  | "black"
+  | "dark-gray"
+  | "gray"
+  | "light-gray"
+  // Blues
+  | "navy"
+  | "blue"
+  | "sky"
+  // Reds
+  | "dark-red"
+  | "red"
+  | "coral"
+  // Greens
+  | "dark-green"
+  | "green"
+  | "teal"
+  // Warm
+  | "brown"
+  | "orange"
+  | "amber"
+  // Cool
+  | "purple"
+  | "pink"
+  | "magenta";
+
+export type TextAlign = "left" | "center" | "right";
+export type FontStyle = "normal" | "italic";
+export type FontFamily = "helvetica" | "times" | "courier";
+
 export interface TextAnnotation {
   id: string;
   page: number;
   position: { x: number; y: number };
   text: string;
   fontSize: number;
+  fontFamily: FontFamily;
   fontWeight: "normal" | "bold";
+  fontStyle: FontStyle;
+  color: TextAnnotationColor;
+  textAlign: TextAlign;
   width?: number; // Optional width for multi-line text wrapping
 }
 

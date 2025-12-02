@@ -1,5 +1,7 @@
+"use client";
+
 import { useState, useRef } from "react";
-import { X } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { StrikethroughAnnotation, StrikethroughColor } from "@/lib/pdf/types";
 
@@ -94,8 +96,8 @@ export function StrikethroughOverlay({
           <div
             className={cn(
               "absolute inset-0",
-              isSelected && "ring-2 ring-amber-400 ring-offset-1 rounded-sm",
-              isHovered && !isSelected && "ring-1 ring-amber-300 rounded-sm"
+              isSelected && "ring-2 ring-ring ring-offset-1 rounded-sm",
+              isHovered && !isSelected && "ring-1 ring-ring/60 rounded-sm"
             )}
           />
         </div>
@@ -107,7 +109,7 @@ export function StrikethroughOverlay({
           className={cn(
             "absolute pointer-events-auto -translate-x-1/2",
             "flex items-center justify-center",
-            "bg-white rounded shadow-lg border border-stone-200",
+            "bg-popover rounded shadow-lg border border-border",
             "w-5 h-5"
           )}
           style={{
@@ -126,12 +128,12 @@ export function StrikethroughOverlay({
             onMouseDown={(e) => e.stopPropagation()}
             className={cn(
               "flex items-center justify-center w-full h-full rounded",
-              "text-stone-500 hover:text-red-600 hover:bg-red-50",
+              "text-muted-foreground hover:text-destructive hover:bg-destructive/10",
               "transition-colors"
             )}
             title="Delete"
           >
-            <X className="w-3 h-3" />
+            <Trash2 className="w-3 h-3" />
           </button>
         </div>
       )}

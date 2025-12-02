@@ -1,8 +1,18 @@
+"use client";
+
 import { useState, useEffect, useRef } from "react";
 import { Highlighter, Strikethrough, ChevronDown, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { HighlightColor, StrikethroughColor } from "@/lib/pdf/types";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
+// Note: These are intentionally hardcoded Tailwind colors for the highlighting feature
+// They represent specific highlight marker colors, not design system colors
 const HIGHLIGHT_COLORS: { color: HighlightColor; bg: string; label: string }[] = [
   { color: "yellow", bg: "bg-yellow-300", label: "Yellow" },
   { color: "green", bg: "bg-green-300", label: "Green" },
@@ -13,7 +23,7 @@ const HIGHLIGHT_COLORS: { color: HighlightColor; bg: string; label: string }[] =
 
 const STRIKETHROUGH_COLORS: { color: StrikethroughColor; bg: string; label: string }[] = [
   { color: "red", bg: "bg-red-500", label: "Red" },
-  { color: "black", bg: "bg-stone-800", label: "Black" },
+  { color: "black", bg: "bg-foreground", label: "Black" },
 ];
 
 interface SelectionToolbarProps {
@@ -68,128 +78,161 @@ export function SelectionToolbar({
     setShowStrikethroughPicker(false);
   };
 
+  // Prevent clicks from clearing selection
+  const preventSelectionLoss = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
   return (
-    <div
-      ref={toolbarRef}
-      className="fixed z-[100]"
-      style={{
-        left: position.x,
-        top: position.y - 44,
-        transform: "translateX(-50%)",
-      }}
-      onMouseDown={(e) => e.preventDefault()} // Prevent losing selection
-    >
-      <div className="flex items-center gap-0.5 px-1 py-1 bg-white rounded-lg shadow-lg border border-stone-200">
-        {/* Highlight button with color picker */}
-        <div className="relative">
-          <button
-            type="button"
-            className={cn(
-              "flex items-center gap-1 px-2 py-1.5 rounded-md transition-colors",
-              "text-stone-600 hover:text-stone-900 hover:bg-stone-100",
-              showHighlightPicker && "bg-stone-100 text-stone-900"
-            )}
-            onClick={() => {
-              setShowHighlightPicker(!showHighlightPicker);
-              setShowStrikethroughPicker(false);
-            }}
-            title="Highlight text"
-          >
-            <Highlighter className="w-4 h-4" />
-            <ChevronDown className="w-3 h-3" />
-          </button>
-
-          {/* Highlight color picker dropdown */}
-          {showHighlightPicker && (
-            <div
-              className="absolute top-full left-0 mt-1 p-1.5 bg-white rounded-lg shadow-lg border border-stone-200 flex gap-1"
-              onMouseDown={(e) => e.preventDefault()}
-            >
-              {HIGHLIGHT_COLORS.map(({ color, bg, label }) => (
+    <TooltipProvider>
+      <div
+        ref={toolbarRef}
+        className="fixed z-[100]"
+        style={{
+          left: position.x,
+          top: position.y - 44,
+          transform: "translateX(-50%)",
+        }}
+        onMouseDown={preventSelectionLoss}
+        onClick={preventSelectionLoss}
+      >
+        <div className="flex items-center gap-0.5 px-1 py-1 bg-popover rounded-lg shadow-lg border border-border">
+          {/* Highlight button with color picker */}
+          <div className="relative">
+            <Tooltip>
+              <TooltipTrigger asChild>
                 <button
-                  key={color}
                   type="button"
                   className={cn(
-                    "w-6 h-6 rounded-full transition-transform hover:scale-110",
-                    bg
+                    "flex items-center gap-1 px-2 py-1.5 rounded-md transition-colors",
+                    "text-muted-foreground hover:text-foreground hover:bg-accent",
+                    showHighlightPicker && "bg-accent text-foreground"
                   )}
-                  onClick={() => {
-                    onHighlight(color);
-                    closeDropdowns();
+                  onMouseDown={preventSelectionLoss}
+                  onClick={(e) => {
+                    preventSelectionLoss(e);
+                    setShowHighlightPicker(!showHighlightPicker);
+                    setShowStrikethroughPicker(false);
                   }}
-                  title={label}
-                />
-              ))}
-            </div>
-          )}
-        </div>
+                >
+                  <Highlighter className="w-4 h-4" />
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Highlight</TooltipContent>
+            </Tooltip>
 
-        {/* Divider */}
-        <div className="w-px h-5 bg-stone-200 mx-0.5" />
-
-        {/* Strikethrough button with color picker */}
-        <div className="relative">
-          <button
-            type="button"
-            className={cn(
-              "flex items-center gap-1 px-2 py-1.5 rounded-md transition-colors",
-              "text-stone-600 hover:text-red-600 hover:bg-red-50",
-              showStrikethroughPicker && "bg-red-50 text-red-600"
+            {/* Highlight color picker dropdown */}
+            {showHighlightPicker && (
+              <div
+                className="absolute top-full left-0 mt-1 p-1.5 bg-popover rounded-lg shadow-lg border border-border flex gap-1"
+                onMouseDown={preventSelectionLoss}
+                onClick={preventSelectionLoss}
+              >
+                {HIGHLIGHT_COLORS.map(({ color, bg, label }) => (
+                  <button
+                    key={color}
+                    type="button"
+                    className={cn(
+                      "w-6 h-6 rounded-full transition-transform hover:scale-110",
+                      bg
+                    )}
+                    onMouseDown={preventSelectionLoss}
+                    onClick={(e) => {
+                      preventSelectionLoss(e);
+                      onHighlight(color);
+                      closeDropdowns();
+                    }}
+                    title={label}
+                  />
+                ))}
+              </div>
             )}
-            onClick={() => {
-              setShowStrikethroughPicker(!showStrikethroughPicker);
-              setShowHighlightPicker(false);
-            }}
-            title="Strikethrough text"
-          >
-            <Strikethrough className="w-4 h-4" />
-            <ChevronDown className="w-3 h-3" />
-          </button>
+          </div>
 
-          {/* Strikethrough color picker dropdown */}
-          {showStrikethroughPicker && (
-            <div
-              className="absolute top-full right-0 mt-1 p-1.5 bg-white rounded-lg shadow-lg border border-stone-200 flex gap-1"
-              onMouseDown={(e) => e.preventDefault()}
-            >
-              {STRIKETHROUGH_COLORS.map(({ color, bg, label }) => (
+          {/* Divider */}
+          <div className="w-px h-5 bg-border mx-0.5" />
+
+          {/* Strikethrough button with color picker */}
+          <div className="relative">
+            <Tooltip>
+              <TooltipTrigger asChild>
                 <button
-                  key={color}
                   type="button"
                   className={cn(
-                    "w-6 h-6 rounded-full transition-transform hover:scale-110",
-                    bg
+                    "flex items-center gap-1 px-2 py-1.5 rounded-md transition-colors",
+                    "text-muted-foreground hover:text-destructive hover:bg-destructive/10",
+                    showStrikethroughPicker && "bg-destructive/10 text-destructive"
                   )}
-                  onClick={() => {
-                    onStrikethrough(color);
-                    closeDropdowns();
+                  onMouseDown={preventSelectionLoss}
+                  onClick={(e) => {
+                    preventSelectionLoss(e);
+                    setShowStrikethroughPicker(!showStrikethroughPicker);
+                    setShowHighlightPicker(false);
                   }}
-                  title={label}
-                />
-              ))}
-            </div>
-          )}
+                >
+                  <Strikethrough className="w-4 h-4" />
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Strikethrough</TooltipContent>
+            </Tooltip>
+
+            {/* Strikethrough color picker dropdown */}
+            {showStrikethroughPicker && (
+              <div
+                className="absolute top-full right-0 mt-1 p-1.5 bg-popover rounded-lg shadow-lg border border-border flex gap-1"
+                onMouseDown={preventSelectionLoss}
+                onClick={preventSelectionLoss}
+              >
+                {STRIKETHROUGH_COLORS.map(({ color, bg, label }) => (
+                  <button
+                    key={color}
+                    type="button"
+                    className={cn(
+                      "w-6 h-6 rounded-full transition-transform hover:scale-110",
+                      bg
+                    )}
+                    onMouseDown={preventSelectionLoss}
+                    onClick={(e) => {
+                      preventSelectionLoss(e);
+                      onStrikethrough(color);
+                      closeDropdowns();
+                    }}
+                    title={label}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Divider */}
+          <div className="w-px h-5 bg-border mx-0.5" />
+
+          {/* Redact button */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className={cn(
+                  "flex items-center gap-1 px-2 py-1.5 rounded-md transition-colors",
+                  "text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                )}
+                onMouseDown={preventSelectionLoss}
+                onClick={(e) => {
+                  preventSelectionLoss(e);
+                  onRedact();
+                  closeDropdowns();
+                }}
+              >
+                <EyeOff className="w-4 h-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Redact</TooltipContent>
+          </Tooltip>
         </div>
-
-        {/* Divider */}
-        <div className="w-px h-5 bg-stone-200 mx-0.5" />
-
-        {/* Redact button */}
-        <button
-          type="button"
-          className={cn(
-            "flex items-center gap-1 px-2 py-1.5 rounded-md transition-colors",
-            "text-stone-600 hover:text-red-700 hover:bg-red-50"
-          )}
-          onClick={() => {
-            onRedact();
-            closeDropdowns();
-          }}
-          title="Redact text"
-        >
-          <EyeOff className="w-4 h-4" />
-        </button>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }

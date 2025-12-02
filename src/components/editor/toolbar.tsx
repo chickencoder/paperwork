@@ -1,4 +1,6 @@
-import { useState } from "react";
+"use client";
+
+import { useState, useEffect } from "react";
 import {
   MousePointer2,
   Type,
@@ -6,9 +8,6 @@ import {
   ZoomIn,
   ZoomOut,
   Download,
-  Printer,
-  RotateCcw,
-  ImageIcon,
   Undo2,
   Redo2,
 } from "lucide-react";
@@ -18,6 +17,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Switch } from "@/components/ui/switch";
 import { SignaturePopover } from "./signature/signature-popover";
 
 interface ToolbarProps {
@@ -27,16 +33,16 @@ interface ToolbarProps {
   isSignaturePopoverOpen: boolean;
   canUndo: boolean;
   canRedo: boolean;
+  hasRedactions: boolean;
+  hasTabBar?: boolean;
   onUndo: () => void;
   onRedo: () => void;
-  onScaleChange: (scale: number) => void;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
   onToolChange: (tool: "select" | "text-insert" | "signature") => void;
   onSignaturePopoverChange: (open: boolean) => void;
   onSignatureCreated: (dataUrl: string) => void;
-  onDownload: () => void;
-  onRasterize: () => void;
-  onPrint: () => void;
-  onReset: () => void;
+  onDownload: (options: { rasterize: boolean; hasRedactions: boolean }) => void;
 }
 
 export function Toolbar({
@@ -45,183 +51,212 @@ export function Toolbar({
   isSignaturePopoverOpen,
   canUndo,
   canRedo,
+  hasRedactions,
+  hasTabBar = false,
   onUndo,
   onRedo,
-  onScaleChange,
+  onZoomIn,
+  onZoomOut,
   onToolChange,
   onSignaturePopoverChange,
   onSignatureCreated,
   onDownload,
-  onRasterize,
-  onPrint,
-  onReset,
 }: ToolbarProps) {
   const [isDownloadOpen, setIsDownloadOpen] = useState(false);
-  const zoomIn = () => onScaleChange(Math.min(scale + 0.25, 3));
-  const zoomOut = () => onScaleChange(Math.max(scale - 0.25, 0.5));
+  const [secureDownload, setSecureDownload] = useState(hasRedactions);
+
+  // Update secure download toggle when redactions change
+  useEffect(() => {
+    setSecureDownload(hasRedactions);
+  }, [hasRedactions]);
 
   return (
-    <div className="sticky top-4 z-50 flex justify-center pointer-events-none">
-      <div className="pointer-events-auto flex items-center gap-0.5 bg-white/90 backdrop-blur-md rounded-full shadow-lg shadow-stone-900/10 border border-stone-200/60 px-1.5 py-1.5">
-        {/* Edit tools */}
-        <ToolButton
-          icon={<MousePointer2 className="w-4 h-4" />}
-          label="Select"
-          isActive={activeTool === "select"}
-          onClick={() => onToolChange("select")}
-        />
-        <ToolButton
-          icon={<Type className="w-4 h-4" />}
-          label="Add Text"
-          isActive={activeTool === "text-insert"}
-          onClick={() => onToolChange("text-insert")}
-        />
-        <SignaturePopover
-          open={isSignaturePopoverOpen}
-          onOpenChange={onSignaturePopoverChange}
-          onSignatureCreated={onSignatureCreated}
-        >
-          <button
-            type="button"
-            title="Add Signature"
-            className={cn(
-              "p-2 rounded-full transition-all duration-150",
-              "focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-400",
-              activeTool === "signature"
-                ? "bg-stone-100 text-stone-900"
-                : "text-stone-500 hover:text-stone-900 hover:bg-stone-50"
-            )}
-          >
-            <Signature className="w-4 h-4" />
-          </button>
-        </SignaturePopover>
-
-        <Divider />
-
-        {/* Zoom controls */}
-        <ToolButton
-          icon={<ZoomOut className="w-4 h-4" />}
-          label="Zoom out"
-          onClick={zoomOut}
-          disabled={scale <= 0.5}
-        />
-        <span className="font-body text-xs text-stone-500 w-10 text-center tabular-nums">
-          {Math.round(scale * 100)}%
-        </span>
-        <ToolButton
-          icon={<ZoomIn className="w-4 h-4" />}
-          label="Zoom in"
-          onClick={zoomIn}
-          disabled={scale >= 3}
-        />
-
-        <Divider />
-
-        {/* Actions */}
-        <ToolButton
-          icon={<Undo2 className="w-4 h-4" />}
-          label="Undo (⌘Z)"
-          onClick={onUndo}
-          disabled={!canUndo}
-        />
-        <ToolButton
-          icon={<Redo2 className="w-4 h-4" />}
-          label="Redo (⌘⇧Z)"
-          onClick={onRedo}
-          disabled={!canRedo}
-        />
-        <ToolButton
-          icon={<RotateCcw className="w-4 h-4" />}
-          label="New document"
-          onClick={onReset}
-        />
-
-        {/* Download dropdown */}
-        <Popover open={isDownloadOpen} onOpenChange={setIsDownloadOpen}>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              title="Download options"
-              className={cn(
-                "p-2 rounded-full transition-all duration-150",
-                "focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-400",
-                "bg-stone-900 text-white hover:bg-stone-800"
-              )}
+    <TooltipProvider delayDuration={400}>
+      <div
+        className={cn(
+          "sticky z-[70] flex justify-center pointer-events-none",
+          hasTabBar ? "top-12" : "top-4"
+        )}
+      >
+        <div className="pointer-events-auto flex items-center gap-0.5 bg-popover/90 backdrop-blur-md rounded-full shadow-lg shadow-foreground/10 border border-border/60 px-1.5 py-1.5">
+          {/* Edit tools */}
+          <ToolButton
+            icon={<MousePointer2 className="w-4 h-4" />}
+            label="Select"
+            isActive={activeTool === "select"}
+            onClick={() => onToolChange("select")}
+          />
+          <ToolButton
+            icon={<Type className="w-4 h-4" />}
+            label="Add Text"
+            isActive={activeTool === "text-insert"}
+            onClick={() => onToolChange("text-insert")}
+          />
+          <Tooltip>
+            <SignaturePopover
+              open={isSignaturePopoverOpen}
+              onOpenChange={onSignaturePopoverChange}
+              onSignatureCreated={onSignatureCreated}
             >
-              <Download className="w-4 h-4" />
-            </button>
-          </PopoverTrigger>
-          <PopoverContent
-            align="center"
-            sideOffset={12}
-            className="w-64 p-2 rounded-2xl"
-          >
-            <div className="flex flex-col gap-0.5">
-              {/* Print button */}
-              <button
-                type="button"
-                onClick={() => {
-                  onPrint();
-                  setIsDownloadOpen(false);
-                }}
-                className={cn(
-                  "flex items-center gap-3 w-full px-3 py-2 rounded-lg",
-                  "text-left text-sm font-medium text-stone-700",
-                  "hover:bg-stone-100 transition-colors"
-                )}
-              >
-                <Printer className="w-4 h-4 text-stone-500" />
-                Print
-              </button>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className={cn(
+                    "p-2 rounded-full transition-all duration-150",
+                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    activeTool === "signature"
+                      ? "bg-accent text-accent-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                  )}
+                >
+                  <Signature className="w-4 h-4" />
+                </button>
+              </TooltipTrigger>
+            </SignaturePopover>
+            <TooltipContent side="bottom">
+              <p>Add Signature</p>
+            </TooltipContent>
+          </Tooltip>
 
-              {/* Rasterize & download button with help text */}
-              <button
-                type="button"
-                onClick={() => {
-                  onRasterize();
-                  setIsDownloadOpen(false);
-                }}
-                className={cn(
-                  "flex flex-col w-full px-3 py-2 rounded-lg",
-                  "text-left text-sm",
-                  "hover:bg-stone-100 transition-colors"
-                )}
-              >
-                <div className="flex items-center gap-3">
-                  <ImageIcon className="w-4 h-4 text-stone-500 shrink-0" />
-                  <span className="font-medium text-stone-700">Download as images</span>
-                </div>
-                <div className="text-xs text-stone-500 mt-1 ml-7">
-                  Converts pages to images, ensuring redacted text is unreadable
-                </div>
-              </button>
+          <Divider />
 
-              {/* Primary download button */}
-              <button
-                type="button"
-                onClick={() => {
-                  onDownload();
-                  setIsDownloadOpen(false);
-                }}
-                className={cn(
-                  "flex items-center justify-center gap-2 w-full px-3 py-2 rounded-full mt-2",
-                  "text-sm font-medium",
-                  "bg-stone-900 text-white hover:bg-stone-800 transition-colors"
-                )}
+          {/* Zoom controls */}
+          <ToolButton
+            icon={<ZoomOut className="w-4 h-4" />}
+            label="Zoom out"
+            onClick={onZoomOut}
+            disabled={scale <= 0.5}
+          />
+          <span className="text-xs text-muted-foreground w-10 text-center tabular-nums">
+            {Math.round(scale * 100)}%
+          </span>
+          <ToolButton
+            icon={<ZoomIn className="w-4 h-4" />}
+            label="Zoom in"
+            onClick={onZoomIn}
+            disabled={scale >= 3}
+          />
+
+          <Divider />
+
+          {/* Undo/Redo */}
+          <ToolButton
+            icon={<Undo2 className="w-4 h-4" />}
+            label="Undo"
+            onClick={onUndo}
+            disabled={!canUndo}
+          />
+          <ToolButton
+            icon={<Redo2 className="w-4 h-4" />}
+            label="Redo"
+            onClick={onRedo}
+            disabled={!canRedo}
+          />
+
+          <div className="w-1" />
+
+          {/* Download dropdown */}
+          <Tooltip>
+            <Popover open={isDownloadOpen} onOpenChange={setIsDownloadOpen}>
+              <TooltipTrigger asChild>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className={cn(
+                      "p-2 rounded-full transition-all duration-150",
+                      "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      "bg-primary text-primary-foreground hover:bg-primary/90"
+                    )}
+                  >
+                    <Download className="w-4 h-4" />
+                  </button>
+                </PopoverTrigger>
+              </TooltipTrigger>
+              <PopoverContent
+                align="center"
+                sideOffset={12}
+                className="w-72 p-2 rounded-2xl"
               >
-                <Download className="w-4 h-4" />
-                Download PDF
-              </button>
-            </div>
-          </PopoverContent>
-        </Popover>
+                <div className="flex flex-col gap-1">
+                  {/* Auto-flatten notice when redactions exist */}
+                  {hasRedactions ? (
+                    <div className="px-3 py-2.5 rounded-xl bg-muted">
+                      <p className="text-sm font-medium text-foreground">
+                        Redactions will be flattened
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Pages are converted to images to protect redacted
+                        content
+                      </p>
+                    </div>
+                  ) : (
+                    /* Flatten toggle only shown when no redactions */
+                    <button
+                      type="button"
+                      onClick={() => setSecureDownload(!secureDownload)}
+                      className={cn(
+                        "flex items-center justify-between gap-3 w-full px-3 py-2.5 rounded-xl text-left transition-colors",
+                        secureDownload ? "bg-muted" : "hover:bg-accent"
+                      )}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <span
+                          className={cn(
+                            "font-medium text-sm",
+                            secureDownload
+                              ? "text-foreground"
+                              : "text-foreground/80"
+                          )}
+                        >
+                          Flatten PDF
+                        </span>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Converts pages to images
+                        </p>
+                      </div>
+                      <Switch
+                        checked={secureDownload}
+                        onCheckedChange={setSecureDownload}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </button>
+                  )}
+
+                  {/* Primary download button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Always flatten if there are redactions, otherwise use toggle state
+                      onDownload({
+                        rasterize: hasRedactions || secureDownload,
+                        hasRedactions,
+                      });
+                      setIsDownloadOpen(false);
+                    }}
+                    className={cn(
+                      "flex items-center justify-center gap-2 w-full px-3 py-2.5 rounded-full mt-1",
+                      "text-sm font-medium",
+                      "bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                    )}
+                  >
+                    <Download className="w-4 h-4" />
+                    Download PDF
+                  </button>
+                </div>
+              </PopoverContent>
+            </Popover>
+            <TooltipContent side="bottom">
+              <p>Download</p>
+            </TooltipContent>
+          </Tooltip>
+        </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }
 
 function Divider() {
-  return <div className="h-5 w-px bg-stone-200 mx-1" />;
+  return <div className="h-5 w-px bg-border mx-1" />;
 }
 
 interface ToolButtonProps {
@@ -229,7 +264,7 @@ interface ToolButtonProps {
   label: string;
   isActive?: boolean;
   disabled?: boolean;
-  variant?: "default" | "primary";
+  variant?: "default" | "primary" | "secondary";
   onClick: () => void;
 }
 
@@ -242,23 +277,31 @@ function ToolButton({
   onClick,
 }: ToolButtonProps) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      title={label}
-      className={cn(
-        "p-2 rounded-full transition-all duration-150",
-        "focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-400",
-        "disabled:opacity-40 disabled:cursor-not-allowed",
-        variant === "primary"
-          ? "bg-stone-900 text-white hover:bg-stone-800"
-          : isActive
-            ? "bg-stone-100 text-stone-900"
-            : "text-stone-500 hover:text-stone-900 hover:bg-stone-50"
-      )}
-    >
-      {icon}
-    </button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={onClick}
+          disabled={disabled}
+          className={cn(
+            "p-2 rounded-full transition-all duration-150",
+            "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            "disabled:opacity-40 disabled:cursor-not-allowed",
+            variant === "primary"
+              ? "bg-primary text-primary-foreground hover:bg-primary/90"
+              : variant === "secondary"
+              ? "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              : isActive
+              ? "bg-accent text-accent-foreground"
+              : "text-muted-foreground hover:text-foreground hover:bg-accent"
+          )}
+        >
+          {icon}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom">
+        <p>{label}</p>
+      </TooltipContent>
+    </Tooltip>
   );
 }

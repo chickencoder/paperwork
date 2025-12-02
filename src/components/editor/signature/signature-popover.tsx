@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useCallback } from "react";
 import { Pen, Type } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -54,17 +56,10 @@ export function SignaturePopover({
         sideOffset={12}
         className="w-80 p-0 rounded-2xl"
       >
-        {/* Header */}
-        <div className="px-4 py-3 border-b border-stone-200">
-          <h3 className="font-body text-sm font-semibold text-stone-900">
-            Add Signature
-          </h3>
-        </div>
-
         {/* Content */}
-        <div className="p-4 space-y-4">
+        <div className="p-3 space-y-3">
           {/* Mode Toggle */}
-          <div className="flex gap-1 p-1 bg-stone-100 rounded-lg">
+          <div className="flex gap-1 p-1 bg-muted rounded-lg">
             <button
               type="button"
               onClick={() => {
@@ -73,10 +68,10 @@ export function SignaturePopover({
               }}
               className={cn(
                 "flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md",
-                "font-body text-sm transition-all",
+                "text-sm transition-all",
                 createMode === "type"
-                  ? "bg-white shadow-sm text-stone-900"
-                  : "text-stone-500 hover:text-stone-700"
+                  ? "bg-card shadow-sm text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
               )}
             >
               <Type className="w-4 h-4" />
@@ -90,10 +85,10 @@ export function SignaturePopover({
               }}
               className={cn(
                 "flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md",
-                "font-body text-sm transition-all",
+                "text-sm transition-all",
                 createMode === "draw"
-                  ? "bg-white shadow-sm text-stone-900"
-                  : "text-stone-500 hover:text-stone-700"
+                  ? "bg-card shadow-sm text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
               )}
             >
               <Pen className="w-4 h-4" />
@@ -110,17 +105,17 @@ export function SignaturePopover({
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-3 border-t border-stone-200">
+        <div className="px-4 py-3 border-t border-border">
           <button
             type="button"
             onClick={handleUseSignature}
             disabled={!signatureData}
             className={cn(
-              "w-full px-4 py-2 rounded-full font-body text-sm font-medium",
+              "w-full px-4 py-2 rounded-full text-sm font-medium",
               "transition-all",
               signatureData
-                ? "bg-stone-900 text-white hover:bg-stone-800"
-                : "bg-stone-200 text-stone-400 cursor-not-allowed"
+                ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                : "bg-secondary text-muted-foreground cursor-not-allowed"
             )}
           >
             Add to Document

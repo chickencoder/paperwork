@@ -1,186 +1,231 @@
-import { useRef, useCallback, useEffect, useState } from "react";
+import { useRef, useCallback, useEffect, useState, type RefObject } from "react";
 
 interface UseZoomOptions {
-  currentScale: number;
+  containerRef?: RefObject<HTMLElement | null>; // Container to apply CSS transform to
   minScale?: number;
   maxScale?: number;
+  initialBaseScale?: number; // Render PDF at higher resolution initially for better downscaling
   commitDelayMs?: number;
-  containerRef: React.RefObject<HTMLElement | null>;
-  onScaleChange: (newScale: number) => void;
+  onCommit?: (scale: number) => void;
+  onZoomStart?: () => void; // Called when zoom gesture begins (to dismiss popovers, etc.)
 }
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-// Page-based anchor for scroll position restoration
-interface ViewportAnchor {
-  pageIndex: number;
-  offsetRatioY: number; // 0-1, how far down the page
-}
-
-function findViewportAnchor(container: HTMLElement | null): ViewportAnchor {
-  if (!container) return { pageIndex: 0, offsetRatioY: 0.5 };
-
-  const viewportCenterY = window.innerHeight / 2;
-  const pages = container.querySelectorAll("[data-page-index]");
-
-  for (const page of pages) {
-    const rect = page.getBoundingClientRect();
-    // Is viewport center within this page?
-    if (rect.top <= viewportCenterY && rect.bottom >= viewportCenterY) {
-      return {
-        pageIndex: parseInt(page.getAttribute("data-page-index") || "0"),
-        offsetRatioY: (viewportCenterY - rect.top) / rect.height,
-      };
-    }
-  }
-
-  // Fallback: find closest page
-  let closestPage = 0;
-  let closestDistance = Infinity;
-  pages.forEach((page, i) => {
-    const rect = page.getBoundingClientRect();
-    const pageCenter = rect.top + rect.height / 2;
-    const distance = Math.abs(pageCenter - viewportCenterY);
-    if (distance < closestDistance) {
-      closestDistance = distance;
-      closestPage = i;
-    }
-  });
-
-  return { pageIndex: closestPage, offsetRatioY: 0.5 };
-}
-
-function scrollToAnchor(container: HTMLElement | null, anchor: ViewportAnchor) {
-  if (!container) return;
-
-  const page = container.querySelector(
-    `[data-page-index="${anchor.pageIndex}"]`
-  );
-  if (!page) return;
-
-  const rect = page.getBoundingClientRect();
-  const pageTop = rect.top + window.scrollY;
-
-  // Where should the anchor point be in absolute coords?
-  const anchorY = pageTop + rect.height * anchor.offsetRatioY;
-
-  // Scroll to put anchor in viewport center
-  window.scrollTo(0, anchorY - window.innerHeight / 2);
-}
-
 export function useZoom({
-  currentScale,
+  containerRef: _containerRef,
   minScale = 0.5,
   maxScale = 3.0,
-  commitDelayMs = 200,
-  containerRef,
-  onScaleChange,
-}: UseZoomOptions) {
-  const [isZooming, setIsZooming] = useState(false);
-  const [isCommitting, setIsCommitting] = useState(false); // True during re-render phase
+  initialBaseScale = 3.0, // Render at max zoom so all zooming is CSS downscaling (no re-render needed)
+  commitDelayMs = 300,
+  onCommit,
+  onZoomStart,
+}: UseZoomOptions = {}) {
+  // Base scale is what the PDF is rendered at (starts higher for crisp downscaling)
+  const [baseScale, setBaseScale] = useState(initialBaseScale);
+  // CSS scale is the transform applied on top of base scale
+  // Start at 1/initialBaseScale so effective scale = 1 (100%)
+  const [cssScale, setCssScale] = useState(1 / initialBaseScale);
 
-  const targetScaleRef = useRef(currentScale);
-  const baseScaleRef = useRef(currentScale);
+  // Refs for tracking during gestures
+  const targetScaleRef = useRef(1); // The actual zoom level user wants (starts at 1 = 100%)
+  const baseScaleRef = useRef(initialBaseScale);
   const commitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isZoomingRef = useRef(false);
+  const zoomEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Track the CSS scale as a ref to avoid re-render loops, only use state for final value
-  const cssScaleRef = useRef(1);
-  const [cssScaleState, setCssScaleState] = useState(1);
+  // Effective scale = baseScale * cssScale (what the user sees)
+  const effectiveScale = baseScale * cssScale;
 
-  // Sync refs with current scale when not zooming
-  useEffect(() => {
-    if (!isZooming) {
-      targetScaleRef.current = currentScale;
-      baseScaleRef.current = currentScale;
+  // Ref to track CSS scale for synchronous reads
+  const cssScaleRef = useRef(1 / initialBaseScale);
+
+  // Apply CSS transform directly to DOM for synchronous updates (no flicker)
+  const applyTransform = useCallback((scale: number) => {
+    const container = _containerRef?.current;
+    if (container) {
+      container.style.transform = scale !== 1 ? `scale(${scale})` : "";
+      container.style.transformOrigin = "center top";
     }
-  }, [currentScale, isZooming]);
+    cssScaleRef.current = scale;
+    setCssScale(scale);
+  }, [_containerRef]);
 
   const handleWheel = useCallback(
     (e: WheelEvent) => {
-      if (e.ctrlKey) {
-        e.preventDefault();
+      if (!e.ctrlKey) return;
+      e.preventDefault();
 
-        // Start zoom gesture if not already zooming
-        if (!isZooming) {
-          setIsZooming(true);
-          baseScaleRef.current = currentScale;
-          targetScaleRef.current = currentScale;
-          cssScaleRef.current = 1;
-        }
+      // Calculate new target scale
+      const delta = -e.deltaY * 0.01;
+      const oldTarget = targetScaleRef.current;
+      const newTarget = clamp(oldTarget * (1 + delta), minScale, maxScale);
 
-        // Calculate new target scale
-        const delta = -e.deltaY * 0.01;
-        const newTarget = clamp(
-          targetScaleRef.current * (1 + delta),
-          minScale,
-          maxScale
-        );
-        targetScaleRef.current = newTarget;
+      // Skip if scale didn't change (at min/max bounds)
+      if (oldTarget === newTarget) return;
 
-        // Update CSS scale (ratio of target to base)
-        const newCssScale = newTarget / baseScaleRef.current;
-        cssScaleRef.current = newCssScale;
-        setCssScaleState(newCssScale);
-
-        // Debounce the commit - only re-render when gesture stops
-        if (commitTimerRef.current) {
-          clearTimeout(commitTimerRef.current);
-        }
-
-        commitTimerRef.current = setTimeout(() => {
-          // 1. Find anchor BEFORE any changes
-          const anchor = findViewportAnchor(containerRef.current);
-
-          // 2. Enter commit state (visibility: hidden)
-          setIsCommitting(true);
-
-          // 3. Force a paint to ensure content is hidden
-          // Using rAF ensures we're in the next frame where visibility is applied
-          requestAnimationFrame(() => {
-            // 4. Now safe to change scale - content is definitely hidden
-            onScaleChange(targetScaleRef.current);
-            baseScaleRef.current = targetScaleRef.current;
-            commitTimerRef.current = null;
-
-            // 5. Reset CSS transform
-            cssScaleRef.current = 1;
-            setCssScaleState(1);
-
-            // 6. Wait for React to render new scale
-            requestAnimationFrame(() => {
-              requestAnimationFrame(() => {
-                // 7. Restore scroll based on anchor
-                scrollToAnchor(containerRef.current, anchor);
-
-                // 8. Reveal content
-                setIsCommitting(false);
-                setIsZooming(false);
-              });
-            });
-          });
-        }, commitDelayMs);
+      // Call onZoomStart once at the beginning of a zoom gesture
+      if (!isZoomingRef.current) {
+        isZoomingRef.current = true;
+        onZoomStart?.();
       }
+
+      // Reset the zoom end timer
+      if (zoomEndTimerRef.current) {
+        clearTimeout(zoomEndTimerRef.current);
+      }
+      zoomEndTimerRef.current = setTimeout(() => {
+        isZoomingRef.current = false;
+        zoomEndTimerRef.current = null;
+      }, 150);
+
+      // Calculate the new CSS scale relative to base
+      const newCssScale = newTarget / baseScaleRef.current;
+      const oldCssScale = cssScaleRef.current;
+
+      // Compensate scroll BEFORE updating scale
+      // The content at viewportCenterY will move by the ratio of scales
+      const viewportCenterY = window.scrollY + window.innerHeight / 2;
+      const scrollRatio = newCssScale / oldCssScale;
+      const newScrollY = viewportCenterY * scrollRatio - window.innerHeight / 2;
+
+      // Update target scale
+      targetScaleRef.current = newTarget;
+
+      // Apply transform and scroll SYNCHRONOUSLY to avoid flicker
+      applyTransform(newCssScale);
+      window.scrollTo({ top: newScrollY, behavior: "instant" as ScrollBehavior });
+
+      // Debounce the commit - only re-render when zooming BEYOND the base scale
+      // Downscaling via CSS looks fine, upscaling gets blurry
+      if (commitTimerRef.current) {
+        clearTimeout(commitTimerRef.current);
+      }
+
+      commitTimerRef.current = setTimeout(() => {
+        const finalScale = targetScaleRef.current;
+        const currentBase = baseScaleRef.current;
+
+        // Only commit if we're zooming beyond the base (upscaling would be blurry)
+        if (finalScale <= currentBase) {
+          commitTimerRef.current = null;
+          return;
+        }
+
+        // Update base scale and reset CSS scale
+        baseScaleRef.current = finalScale;
+        setBaseScale(finalScale);
+        applyTransform(1);
+
+        // Notify parent of the commit
+        onCommit?.(finalScale);
+
+        commitTimerRef.current = null;
+      }, commitDelayMs);
     },
-    [currentScale, isZooming, minScale, maxScale, commitDelayMs, containerRef, onScaleChange]
+    [minScale, maxScale, commitDelayMs, onCommit, onZoomStart, applyTransform]
   );
 
   const zoomIn = useCallback(() => {
-    const newScale = clamp(currentScale + 0.25, minScale, maxScale);
-    onScaleChange(newScale);
-  }, [currentScale, minScale, maxScale, onScaleChange]);
+    const oldTarget = targetScaleRef.current;
+    const newTarget = clamp(oldTarget + 0.25, minScale, maxScale);
+    if (oldTarget === newTarget) return;
+
+    // Dismiss popovers/selections on zoom
+    onZoomStart?.();
+
+    const newCssScale = newTarget / baseScaleRef.current;
+    const oldCssScale = cssScaleRef.current;
+
+    // Compensate scroll
+    const viewportCenterY = window.scrollY + window.innerHeight / 2;
+    const scrollRatio = newCssScale / oldCssScale;
+    const newScrollY = viewportCenterY * scrollRatio - window.innerHeight / 2;
+
+    targetScaleRef.current = newTarget;
+    applyTransform(newCssScale);
+    window.scrollTo({ top: newScrollY, behavior: "instant" as ScrollBehavior });
+
+    // Only commit if zooming beyond base scale
+    if (commitTimerRef.current) {
+      clearTimeout(commitTimerRef.current);
+    }
+    commitTimerRef.current = setTimeout(() => {
+      const finalScale = targetScaleRef.current;
+      const currentBase = baseScaleRef.current;
+      if (finalScale <= currentBase) {
+        commitTimerRef.current = null;
+        return;
+      }
+      baseScaleRef.current = finalScale;
+      setBaseScale(finalScale);
+      applyTransform(1);
+      onCommit?.(finalScale);
+      commitTimerRef.current = null;
+    }, commitDelayMs);
+  }, [minScale, maxScale, commitDelayMs, onCommit, onZoomStart, applyTransform]);
 
   const zoomOut = useCallback(() => {
-    const newScale = clamp(currentScale - 0.25, minScale, maxScale);
-    onScaleChange(newScale);
-  }, [currentScale, minScale, maxScale, onScaleChange]);
+    const oldTarget = targetScaleRef.current;
+    const newTarget = clamp(oldTarget - 0.25, minScale, maxScale);
+    if (oldTarget === newTarget) return;
+
+    // Dismiss popovers/selections on zoom
+    onZoomStart?.();
+
+    const newCssScale = newTarget / baseScaleRef.current;
+    const oldCssScale = cssScaleRef.current;
+
+    // Compensate scroll
+    const viewportCenterY = window.scrollY + window.innerHeight / 2;
+    const scrollRatio = newCssScale / oldCssScale;
+    const newScrollY = viewportCenterY * scrollRatio - window.innerHeight / 2;
+
+    targetScaleRef.current = newTarget;
+    applyTransform(newCssScale);
+    window.scrollTo({ top: newScrollY, behavior: "instant" as ScrollBehavior });
+
+    // Zooming out never needs re-render (downscaling looks fine)
+    if (commitTimerRef.current) {
+      clearTimeout(commitTimerRef.current);
+      commitTimerRef.current = null;
+    }
+  }, [minScale, maxScale, onZoomStart, applyTransform]);
 
   const resetZoom = useCallback(() => {
-    onScaleChange(1.0);
-  }, [onScaleChange]);
+    const oldTarget = targetScaleRef.current;
+    if (oldTarget === 1) return;
 
-  // Cleanup on unmount
+    const newCssScale = 1 / baseScaleRef.current;
+    const oldCssScale = cssScaleRef.current;
+
+    // Compensate scroll
+    const viewportCenterY = window.scrollY + window.innerHeight / 2;
+    const scrollRatio = newCssScale / oldCssScale;
+    const newScrollY = viewportCenterY * scrollRatio - window.innerHeight / 2;
+
+    targetScaleRef.current = 1;
+    applyTransform(newCssScale);
+    window.scrollTo({ top: newScrollY, behavior: "instant" as ScrollBehavior });
+
+    // Reset to 1x is always below initialBaseScale, no re-render needed
+    if (commitTimerRef.current) {
+      clearTimeout(commitTimerRef.current);
+      commitTimerRef.current = null;
+    }
+  }, [applyTransform]);
+
+  // Register wheel event listener
+  useEffect(() => {
+    window.addEventListener("wheel", handleWheel, { passive: false });
+    return () => {
+      window.removeEventListener("wheel", handleWheel);
+    };
+  }, [handleWheel]);
+
+  // Cleanup timer on unmount
   useEffect(() => {
     return () => {
       if (commitTimerRef.current) {
@@ -190,12 +235,11 @@ export function useZoom({
   }, []);
 
   return {
-    handleWheel,
+    baseScale,      // Scale the PDF is rendered at
+    cssScale,       // CSS transform multiplier
+    effectiveScale, // What the user sees (baseScale * cssScale)
     zoomIn,
     zoomOut,
     resetZoom,
-    cssScale: cssScaleState,
-    isZooming,
-    isCommitting,
   };
 }

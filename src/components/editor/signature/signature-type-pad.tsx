@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
 
@@ -8,7 +10,17 @@ interface SignatureTypePadProps {
 const SIGNATURE_FONTS = [
   { name: "Dancing Script", family: "'Dancing Script', cursive" },
   { name: "Great Vibes", family: "'Great Vibes', cursive" },
+  { name: "Allura", family: "'Allura', cursive" },
+  { name: "Sacramento", family: "'Sacramento', cursive" },
   { name: "Caveat", family: "'Caveat', cursive" },
+  { name: "Pacifico", family: "'Pacifico', cursive" },
+  { name: "Satisfy", family: "'Satisfy', cursive" },
+  { name: "Kalam", family: "'Kalam', cursive" },
+  { name: "Permanent Marker", family: "'Permanent Marker', cursive" },
+  { name: "Shadows Into Light", family: "'Shadows Into Light', cursive" },
+  { name: "Indie Flower", family: "'Indie Flower', cursive" },
+  { name: "Amatic SC", family: "'Amatic SC', cursive" },
+  { name: "Brush Script", family: "'Brush Script MT', cursive" },
 ] as const;
 
 export function SignatureTypePad({ onSignatureChange }: SignatureTypePadProps) {
@@ -51,9 +63,12 @@ export function SignatureTypePad({ onSignatureChange }: SignatureTypePadProps) {
     canvas.height = (textHeight + padding * 2) * dpr;
     ctx.scale(dpr, dpr);
 
-    // Draw text
+    // Draw text - use foreground color from CSS or fallback
     ctx.font = `${fontSize}px ${font.family}`;
-    ctx.fillStyle = "#1c1917"; // stone-900
+    ctx.fillStyle =
+      getComputedStyle(document.documentElement)
+        .getPropertyValue("--foreground")
+        .trim() || "#0a0a0a";
     ctx.textBaseline = "middle";
     ctx.fillText(name, padding, (textHeight + padding * 2) / 2);
 
@@ -65,40 +80,38 @@ export function SignatureTypePad({ onSignatureChange }: SignatureTypePadProps) {
   }, [generateSignature]);
 
   return (
-    <div className="space-y-4">
-      <div>
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Type your name"
-          className={cn(
-            "w-full px-3 py-2 rounded-lg border border-stone-300",
-            "font-body text-stone-900 placeholder:text-stone-400",
-            "focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400"
-          )}
-          autoFocus
-        />
-      </div>
+    <div className="space-y-3">
+      <input
+        type="text"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="Type your name"
+        className={cn(
+          "w-full px-3 py-2 rounded-lg border border-input text-sm",
+          "text-foreground placeholder:text-muted-foreground",
+          "focus:outline-none focus:ring-2 focus:ring-ring/50 focus:border-ring"
+        )}
+        autoFocus
+      />
 
       <div className="space-y-2">
-        <span className="text-sm text-stone-500 font-body">Choose a style:</span>
-        <div className="grid grid-cols-1 gap-2">
+        <span className="text-xs text-muted-foreground">Style</span>
+        <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto">
           {SIGNATURE_FONTS.map((font, index) => (
             <button
               key={font.name}
               type="button"
               onClick={() => setSelectedFont(index)}
               className={cn(
-                "p-3 rounded-lg border-2 text-left transition-all",
-                "hover:border-stone-400",
+                "p-2.5 rounded-lg border-2 text-left transition-all",
+                "hover:border-ring",
                 selectedFont === index
-                  ? "border-amber-400 bg-amber-50"
-                  : "border-stone-200 bg-white"
+                  ? "border-ring bg-accent"
+                  : "border-border bg-card"
               )}
             >
               <span
-                className="text-2xl text-stone-900 block truncate"
+                className="text-xl text-foreground block truncate"
                 style={{ fontFamily: font.family }}
               >
                 {name || "Your Name"}

@@ -8,6 +8,8 @@ import type {
   RedactionAnnotation,
   HighlightColor,
   StrikethroughColor,
+  TextAnnotationColor,
+  FontFamily,
 } from "./types";
 import type { ExtractedFormValues } from "./form-extractor";
 
@@ -24,6 +26,35 @@ const HIGHLIGHT_COLORS: Record<HighlightColor, { r: number; g: number; b: number
 const STRIKETHROUGH_COLORS: Record<StrikethroughColor, { r: number; g: number; b: number }> = {
   red: { r: 0.8, g: 0.1, b: 0.1 },
   black: { r: 0.1, g: 0.1, b: 0.1 },
+};
+
+// Color map for text annotations
+const TEXT_ANNOTATION_COLORS: Record<TextAnnotationColor, { r: number; g: number; b: number }> = {
+  // Grayscale
+  "black": { r: 0.1, g: 0.1, b: 0.1 },
+  "dark-gray": { r: 0.3, g: 0.3, b: 0.3 },
+  "gray": { r: 0.5, g: 0.5, b: 0.5 },
+  "light-gray": { r: 0.7, g: 0.7, b: 0.7 },
+  // Blues
+  "navy": { r: 0.1, g: 0.2, b: 0.5 },
+  "blue": { r: 0.2, g: 0.4, b: 0.8 },
+  "sky": { r: 0.4, g: 0.65, b: 0.9 },
+  // Reds
+  "dark-red": { r: 0.6, g: 0.1, b: 0.1 },
+  "red": { r: 0.85, g: 0.2, b: 0.2 },
+  "coral": { r: 0.95, g: 0.4, b: 0.3 },
+  // Greens
+  "dark-green": { r: 0.1, g: 0.4, b: 0.2 },
+  "green": { r: 0.2, g: 0.6, b: 0.35 },
+  "teal": { r: 0.2, g: 0.55, b: 0.55 },
+  // Warm
+  "brown": { r: 0.5, g: 0.3, b: 0.2 },
+  "orange": { r: 0.95, g: 0.5, b: 0.1 },
+  "amber": { r: 0.95, g: 0.7, b: 0.15 },
+  // Cool
+  "purple": { r: 0.5, g: 0.2, b: 0.65 },
+  "pink": { r: 0.9, g: 0.4, b: 0.55 },
+  "magenta": { r: 0.8, g: 0.2, b: 0.55 },
 };
 
 // Helper to wrap text to fit within a given width
@@ -123,16 +154,80 @@ export async function modifyPDF(
 
   // Add text annotations
   if (textAnnotations.length > 0) {
-    const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    // Embed all font families and their variants
+    const fontFamilies: Record<FontFamily, {
+      regular: PDFFont;
+      bold: PDFFont;
+      italic: PDFFont;
+      boldItalic: PDFFont;
+    }> = {
+      helvetica: {
+        regular: await pdfDoc.embedFont(StandardFonts.Helvetica),
+        bold: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
+        italic: await pdfDoc.embedFont(StandardFonts.HelveticaOblique),
+        boldItalic: await pdfDoc.embedFont(StandardFonts.HelveticaBoldOblique),
+      },
+      times: {
+        regular: await pdfDoc.embedFont(StandardFonts.TimesRoman),
+        bold: await pdfDoc.embedFont(StandardFonts.TimesRomanBold),
+        italic: await pdfDoc.embedFont(StandardFonts.TimesRomanItalic),
+        boldItalic: await pdfDoc.embedFont(StandardFonts.TimesRomanBoldItalic),
+      },
+      courier: {
+        regular: await pdfDoc.embedFont(StandardFonts.Courier),
+        bold: await pdfDoc.embedFont(StandardFonts.CourierBold),
+        italic: await pdfDoc.embedFont(StandardFonts.CourierOblique),
+        boldItalic: await pdfDoc.embedFont(StandardFonts.CourierBoldOblique),
+      },
+    };
     const pages = pdfDoc.getPages();
 
     for (const annotation of textAnnotations) {
       if (annotation.page < pages.length && annotation.text.trim()) {
         const page = pages[annotation.page];
         const pageHeight = page.getHeight();
-        const font = annotation.fontWeight === "bold" ? boldFont : regularFont;
+
+        // Select font family (default to helvetica for backward compatibility)
+        const fontFamily = annotation.fontFamily ?? "helvetica";
+        const fonts = fontFamilies[fontFamily];
+
+        // Select font variant based on weight and style
+        const fontWeight = annotation.fontWeight ?? "normal";
+        const fontStyle = annotation.fontStyle ?? "normal";
+        let font: PDFFont;
+        if (fontWeight === "bold" && fontStyle === "italic") {
+          font = fonts.boldItalic;
+        } else if (fontWeight === "bold") {
+          font = fonts.bold;
+        } else if (fontStyle === "italic") {
+          font = fonts.italic;
+        } else {
+          font = fonts.regular;
+        }
+
+        // Get text color (default to black for backward compatibility)
+        const colorKey = annotation.color ?? "black";
+        const colorValue = TEXT_ANNOTATION_COLORS[colorKey];
+        const textColor = rgb(colorValue.r, colorValue.g, colorValue.b);
+
+        // Get text alignment (default to left for backward compatibility)
+        const textAlign = annotation.textAlign ?? "left";
         const lineHeight = annotation.fontSize * 1.2;
+
+        // Helper to calculate X position based on alignment
+        const getAlignedX = (lineText: string, annotationWidth: number | undefined): number => {
+          if (!annotationWidth || textAlign === "left") {
+            return annotation.position.x;
+          }
+          const textWidth = font.widthOfTextAtSize(lineText, annotation.fontSize);
+          if (textAlign === "center") {
+            return annotation.position.x + (annotationWidth - textWidth) / 2;
+          }
+          if (textAlign === "right") {
+            return annotation.position.x + annotationWidth - textWidth;
+          }
+          return annotation.position.x;
+        };
 
         // If width is set, wrap text to multiple lines
         if (annotation.width) {
@@ -151,11 +246,11 @@ export async function modifyPDF(
               index * lineHeight;
 
             page.drawText(line, {
-              x: annotation.position.x,
+              x: getAlignedX(line, annotation.width),
               y: pdfY,
               size: annotation.fontSize,
               font,
-              color: rgb(0.1, 0.1, 0.1),
+              color: textColor,
             });
           });
         } else {
@@ -168,7 +263,7 @@ export async function modifyPDF(
             y: pdfY,
             size: annotation.fontSize,
             font,
-            color: rgb(0.1, 0.1, 0.1),
+            color: textColor,
           });
         }
       }
@@ -319,6 +414,14 @@ async function rasterizePDF(pdfBytes: Uint8Array): Promise<Uint8Array> {
 
   // Create a new PDF document for the rasterized output
   const newPdfDoc = await PDFDocument.create();
+
+  // Sanitize metadata - remove any potentially sensitive information
+  newPdfDoc.setTitle('');
+  newPdfDoc.setAuthor('');
+  newPdfDoc.setSubject('');
+  newPdfDoc.setKeywords([]);
+  newPdfDoc.setProducer('Paperwork');
+  newPdfDoc.setCreator('');
 
   // Render each page at a higher resolution for quality (2x scale)
   const scale = 2;

@@ -106,11 +106,26 @@ interface EditorStateWithHistory {
   future: HistoryEntry[];
 }
 
+// Exported snapshot type for multi-document state
+export interface EditorSnapshot {
+  scale: number;
+  textAnnotations: TextAnnotation[];
+  signatureAnnotations: SignatureAnnotation[];
+  highlightAnnotations: HighlightAnnotation[];
+  strikethroughAnnotations: StrikethroughAnnotation[];
+  redactionAnnotations: RedactionAnnotation[];
+  selectedAnnotationId: string | null;
+  activeTool: "select" | "text-insert" | "signature";
+  clipboard: ClipboardAnnotation | null;
+  historyLength: number;
+}
+
 // Actions for undo/redo control
 type HistoryAction =
   | EditorAction
   | { type: "UNDO" }
-  | { type: "REDO" };
+  | { type: "REDO" }
+  | { type: "RESTORE_SNAPSHOT"; snapshot: EditorSnapshot; historyLength: number };
 
 const initialState: EditorState = {
   pdfFile: null,
@@ -433,6 +448,29 @@ function editorReducerWithHistory(
 
     case "RESET":
       return initialStateWithHistory;
+
+    case "RESTORE_SNAPSHOT": {
+      // Restore editor state from a snapshot (used when switching tabs)
+      const { snapshot, historyLength } = action;
+      return {
+        current: {
+          pdfFile: state.current.pdfFile,
+          pdfBytes: state.current.pdfBytes,
+          scale: snapshot.scale,
+          textAnnotations: snapshot.textAnnotations,
+          signatureAnnotations: snapshot.signatureAnnotations,
+          highlightAnnotations: snapshot.highlightAnnotations,
+          strikethroughAnnotations: snapshot.strikethroughAnnotations,
+          redactionAnnotations: snapshot.redactionAnnotations,
+          selectedAnnotationId: snapshot.selectedAnnotationId,
+          activeTool: snapshot.activeTool,
+          clipboard: snapshot.clipboard,
+        },
+        // Restore history length indicator (actual history entries are lost on tab switch)
+        past: Array(historyLength).fill(null) as unknown as HistoryEntry[],
+        future: [],
+      };
+    }
 
     default: {
       // Handle regular actions
@@ -824,6 +862,30 @@ export function useEditorState() {
     }
   }, [state.selectedAnnotationId, state.textAnnotations, state.signatureAnnotations, state.highlightAnnotations, state.strikethroughAnnotations, state.redactionAnnotations]);
 
+  // Get current state as a snapshot for saving to multi-document state
+  const getSnapshot = useCallback((): EditorSnapshot => {
+    return {
+      scale: state.scale,
+      textAnnotations: state.textAnnotations,
+      signatureAnnotations: state.signatureAnnotations,
+      highlightAnnotations: state.highlightAnnotations,
+      strikethroughAnnotations: state.strikethroughAnnotations,
+      redactionAnnotations: state.redactionAnnotations,
+      selectedAnnotationId: state.selectedAnnotationId,
+      activeTool: state.activeTool,
+      clipboard: state.clipboard,
+      historyLength: past.length,
+    };
+  }, [state, past.length]);
+
+  // Restore state from a snapshot (when switching tabs)
+  const restoreSnapshot = useCallback((snapshot: EditorSnapshot) => {
+    dispatch({ type: "RESTORE_SNAPSHOT", snapshot, historyLength: snapshot.historyLength });
+  }, []);
+
+  // Track if document has been modified (has undo history)
+  const isDirty = past.length > 0;
+
   return {
     state,
     setPdf,
@@ -855,5 +917,9 @@ export function useEditorState() {
     canRedo,
     undo,
     redo,
+    // Snapshot support for multi-document
+    getSnapshot,
+    restoreSnapshot,
+    isDirty,
   };
 }

@@ -1,20 +1,35 @@
+"use client";
+
 import { useEffect, useCallback, useRef, useState } from "react";
-import { useEditorState } from "@/hooks/use-editor-state";
+import { useEditorState, type EditorSnapshot } from "@/hooks/use-editor-state";
 import { useTextSelection } from "@/hooks/use-text-selection";
 import { useZoom } from "@/hooks/use-zoom";
+import { useScrollProgress } from "@/hooks/use-scroll-progress";
 import { modifyPDF } from "@/lib/pdf/pdf-modifier";
 import { extractFormValues } from "@/lib/pdf/form-extractor";
 import type { HighlightColor, StrikethroughColor } from "@/lib/pdf/types";
 import { PDFViewer, type PDFViewerHandle } from "./pdf-viewer";
 import { Toolbar } from "./toolbar";
 import { SelectionToolbar } from "./selection-toolbar";
+import { ScrollProgress } from "./scroll-progress";
 
 interface PDFEditorProps {
   file: File;
-  onReset: () => void;
+  initialSnapshot?: EditorSnapshot;
+  initialFormValues?: Record<string, string | boolean>;
+  onStateChange?: (snapshot: EditorSnapshot, isDirty: boolean) => void;
+  onFormValuesChange?: (values: Record<string, string | boolean>) => void;
+  hasTabBar?: boolean;
 }
 
-export function PDFEditor({ file, onReset }: PDFEditorProps) {
+export function PDFEditor({
+  file,
+  initialSnapshot,
+  initialFormValues,
+  onStateChange,
+  onFormValuesChange,
+  hasTabBar = false,
+}: PDFEditorProps) {
   const {
     state,
     setPdf,
@@ -30,7 +45,6 @@ export function PDFEditor({ file, onReset }: PDFEditorProps) {
     removeStrikethrough,
     addRedaction,
     removeRedaction,
-    commitZoom,
     setActiveTool,
     selectAnnotation,
     copySelectedAnnotation,
@@ -41,6 +55,9 @@ export function PDFEditor({ file, onReset }: PDFEditorProps) {
     canRedo,
     undo,
     redo,
+    getSnapshot,
+    restoreSnapshot,
+    isDirty,
   } = useEditorState();
 
   const viewerRef = useRef<PDFViewerHandle>(null);
@@ -48,24 +65,28 @@ export function PDFEditor({ file, onReset }: PDFEditorProps) {
   const [isSignaturePopoverOpen, setIsSignaturePopoverOpen] = useState(false);
   const [pendingSignatureData, setPendingSignatureData] = useState<string | null>(null);
   const mousePositionRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const clearSelectionRef = useRef<(() => void) | null>(null);
 
-  // Use zoom hook - CSS transform during gesture, re-render on commit
-  const { handleWheel, zoomIn, zoomOut, resetZoom, cssScale, isZooming, isCommitting } = useZoom({
-    currentScale: state.scale,
+  // Dismiss all popovers and selections when zooming starts
+  const handleZoomStart = useCallback(() => {
+    selectAnnotation(null);
+    setIsSignaturePopoverOpen(false);
+    clearSelectionRef.current?.();
+  }, [selectAnnotation]);
+
+  // Use zoom hook - CSS transform during gesture, re-render PDF on commit
+  const { baseScale, cssScale, effectiveScale, zoomIn, zoomOut, resetZoom } = useZoom({
+    containerRef: viewerContainerRef,
     minScale: 0.5,
     maxScale: 3.0,
-    commitDelayMs: 200,
-    containerRef: viewerContainerRef,
-    onScaleChange: commitZoom,
+    commitDelayMs: 300,
+    onZoomStart: handleZoomStart,
   });
 
-  // Handle toolbar scale changes (direct scale change without CSS transform)
-  const handleToolbarZoom = useCallback((newScale: number) => {
-    const clampedScale = Math.min(3, Math.max(0.5, newScale));
-    if (clampedScale !== state.scale) {
-      commitZoom(clampedScale);
-    }
-  }, [state.scale, commitZoom]);
+  // Track current page and total pages
+  const [totalPages, setTotalPages] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const scrollProgress = useScrollProgress({ currentPage, totalPages });
 
   // Update the container ref when viewer is ready
   useEffect(() => {
@@ -81,9 +102,12 @@ export function PDFEditor({ file, onReset }: PDFEditorProps) {
   // Text selection for highlighting and strikethrough
   const { selection, clearSelection } = useTextSelection({
     containerRef: viewerContainerRef,
-    scale: state.scale,
+    scale: effectiveScale,
     enabled: state.activeTool === "select",
   });
+
+  // Keep ref updated for use in handleZoomStart
+  clearSelectionRef.current = clearSelection;
 
   // Helper to check if user is editing text (to avoid intercepting Delete/Backspace)
   const isEditingText = useCallback(() => {
@@ -104,6 +128,38 @@ export function PDFEditor({ file, onReset }: PDFEditorProps) {
     }
     load();
   }, [file, setPdf]);
+
+  // Restore initial snapshot when component mounts (for tab switching)
+  useEffect(() => {
+    if (initialSnapshot) {
+      restoreSnapshot(initialSnapshot);
+    }
+    // Only run on mount - initialSnapshot should not change during component lifecycle
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Inject initial form values after PDF loads (for session restore)
+  useEffect(() => {
+    if (!initialFormValues || !state.pdfFile) return;
+
+    // Delay to ensure annotation layer is rendered
+    const timer = setTimeout(() => {
+      Object.entries(initialFormValues).forEach(([fieldId, value]) => {
+        viewerRef.current?.setFormFieldValue(fieldId, value);
+      });
+    }, 300);
+
+    return () => clearTimeout(timer);
+    // Only run when PDF loads
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.pdfFile]);
+
+  // Sync state changes to parent for multi-document support
+  useEffect(() => {
+    if (onStateChange && state.pdfFile) {
+      onStateChange(getSnapshot(), isDirty);
+    }
+  }, [onStateChange, getSnapshot, isDirty, state.pdfFile, state.scale, state.textAnnotations, state.signatureAnnotations, state.highlightAnnotations, state.strikethroughAnnotations, state.redactionAnnotations, state.selectedAnnotationId, state.activeTool, state.clipboard]);
 
   // Get current visible page index (first page that's at least partially visible)
   const getCurrentPageIndex = useCallback(() => {
@@ -152,8 +208,8 @@ export function PDFEditor({ file, onReset }: PDFEditorProps) {
         const pageIndex = parseInt(page.getAttribute("data-page-index") || "0", 10);
 
         // Convert mouse position to page-relative coordinates
-        const x = (mouseX - rect.left) / state.scale;
-        const y = (mouseY - rect.top) / state.scale;
+        const x = (mouseX - rect.left) / effectiveScale;
+        const y = (mouseY - rect.top) / effectiveScale;
 
         return { pageIndex, position: { x, y } };
       }
@@ -171,15 +227,15 @@ export function PDFEditor({ file, onReset }: PDFEditorProps) {
         const pageIndex = parseInt(page.getAttribute("data-page-index") || "0", 10);
 
         // Convert viewport center to page-relative coordinates
-        const x = (viewportCenterX - rect.left) / state.scale;
-        const y = (viewportCenterY - rect.top) / state.scale;
+        const x = (viewportCenterX - rect.left) / effectiveScale;
+        const y = (viewportCenterY - rect.top) / effectiveScale;
 
         return { pageIndex, position: { x, y } };
       }
     }
 
     return { pageIndex: getCurrentPageIndex(), position: { x: 100, y: 100 } };
-  }, [state.scale, getCurrentPageIndex]);
+  }, [effectiveScale, getCurrentPageIndex]);
 
   // Undo wrapper that handles form field DOM updates
   const handleUndo = useCallback(() => {
@@ -258,13 +314,11 @@ export function PDFEditor({ file, onReset }: PDFEditorProps) {
 
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("wheel", handleWheel, { passive: false });
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("wheel", handleWheel);
     };
-  }, [zoomIn, zoomOut, resetZoom, handleWheel, state.selectedAnnotationId, state.clipboard, copySelectedAnnotation, pasteAnnotation, deleteSelectedAnnotation, getPlacementPosition, isEditingText, canUndo, canRedo, handleUndo, handleRedo]);
+  }, [zoomIn, zoomOut, resetZoom, state.selectedAnnotationId, state.clipboard, copySelectedAnnotation, pasteAnnotation, deleteSelectedAnnotation, getPlacementPosition, isEditingText, canUndo, canRedo, handleUndo, handleRedo]);
 
   // Handle signature created from popover - places at mouse position or viewport center
   const handleSignatureCreated = useCallback(
@@ -342,12 +396,21 @@ export function PDFEditor({ file, onReset }: PDFEditorProps) {
     [selection, addStrikethrough, clearSelection]
   );
 
-  // Handle form field changes for undo/redo tracking
+  // Handle form field changes for undo/redo tracking and persistence
   const handleFormFieldChange = useCallback(
     (fieldId: string, value: string | boolean, previousValue: string | boolean) => {
       setFormField(fieldId, value, previousValue);
+
+      // Extract and report all form values for persistence
+      if (onFormValuesChange) {
+        const container = viewerRef.current?.getContainer();
+        if (container) {
+          const values = extractFormValues(container);
+          onFormValuesChange(values);
+        }
+      }
     },
-    [setFormField]
+    [setFormField, onFormValuesChange]
   );
 
   // Handle redaction creation from text selection
@@ -364,72 +427,7 @@ export function PDFEditor({ file, onReset }: PDFEditorProps) {
     clearSelection();
   }, [selection, addRedaction, clearSelection]);
 
-  const handleDownload = useCallback(async () => {
-    if (!state.pdfBytes) return;
-
-    try {
-      // Extract form values from the DOM
-      const container = viewerRef.current?.getContainer();
-      const formValues = container ? extractFormValues(container) : {};
-
-      const modifiedBytes = await modifyPDF(
-        state.pdfBytes,
-        formValues,
-        state.textAnnotations,
-        state.signatureAnnotations,
-        state.highlightAnnotations,
-        state.strikethroughAnnotations,
-        state.redactionAnnotations
-      );
-
-      const blob = new Blob([new Uint8Array(modifiedBytes)], { type: "application/pdf" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = file.name.replace(".pdf", "_filled.pdf");
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Failed to download PDF:", error);
-    }
-  }, [state.pdfBytes, state.textAnnotations, state.signatureAnnotations, state.highlightAnnotations, state.strikethroughAnnotations, state.redactionAnnotations, file.name]);
-
-  const handlePrint = useCallback(async () => {
-    if (!state.pdfBytes) return;
-
-    try {
-      // Extract form values from the DOM
-      const container = viewerRef.current?.getContainer();
-      const formValues = container ? extractFormValues(container) : {};
-
-      const modifiedBytes = await modifyPDF(
-        state.pdfBytes,
-        formValues,
-        state.textAnnotations,
-        state.signatureAnnotations,
-        state.highlightAnnotations,
-        state.strikethroughAnnotations,
-        state.redactionAnnotations
-      );
-
-      const blob = new Blob([new Uint8Array(modifiedBytes)], { type: "application/pdf" });
-      const url = URL.createObjectURL(blob);
-
-      // Open in new window for printing
-      const printWindow = window.open(url);
-      if (printWindow) {
-        printWindow.addEventListener("load", () => {
-          printWindow.print();
-        });
-      }
-    } catch (error) {
-      console.error("Failed to print PDF:", error);
-    }
-  }, [state.pdfBytes, state.textAnnotations, state.signatureAnnotations, state.highlightAnnotations, state.strikethroughAnnotations, state.redactionAnnotations]);
-
-  const handleRasterize = useCallback(async () => {
+  const handleDownload = useCallback(async (options: { rasterize: boolean; hasRedactions: boolean }) => {
     if (!state.pdfBytes) return;
 
     try {
@@ -445,27 +443,38 @@ export function PDFEditor({ file, onReset }: PDFEditorProps) {
         state.highlightAnnotations,
         state.strikethroughAnnotations,
         state.redactionAnnotations,
-        { rasterize: true }
+        options.rasterize ? { rasterize: true } : undefined
       );
+
+      // Determine filename suffix based on what was done
+      let suffix = "_filled.pdf";
+      if (options.hasRedactions) {
+        suffix = "_redacted.pdf";
+      } else if (options.rasterize) {
+        suffix = "_flattened.pdf";
+      }
 
       const blob = new Blob([new Uint8Array(modifiedBytes)], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = file.name.replace(".pdf", "_rasterized.pdf");
+      a.download = file.name.replace(".pdf", suffix);
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (error) {
-      console.error("Failed to rasterize PDF:", error);
+      console.error("Failed to download PDF:", error);
     }
   }, [state.pdfBytes, state.textAnnotations, state.signatureAnnotations, state.highlightAnnotations, state.strikethroughAnnotations, state.redactionAnnotations, file.name]);
 
+  // Check if there are any enabled redactions
+  const hasRedactions = state.redactionAnnotations.some(r => r.enabled);
+
   if (!state.pdfFile) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FDFBF7]">
-        <div className="animate-pulse text-stone-400 font-body">
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-pulse text-muted-foreground font-body">
           Loading document...
         </div>
       </div>
@@ -473,34 +482,38 @@ export function PDFEditor({ file, onReset }: PDFEditorProps) {
   }
 
   return (
-    <div className="min-h-screen bg-stone-100 pt-4">
+    <div className="min-h-screen bg-muted pt-4">
+      <ScrollProgress
+        progress={scrollProgress}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        hasTabBar={hasTabBar}
+      />
       <Toolbar
-        scale={state.scale}
+        scale={effectiveScale}
         activeTool={state.activeTool}
         fileName={file.name}
         isSignaturePopoverOpen={isSignaturePopoverOpen}
         canUndo={canUndo}
         canRedo={canRedo}
+        hasRedactions={hasRedactions}
+        hasTabBar={hasTabBar}
         onUndo={handleUndo}
         onRedo={handleRedo}
-        onScaleChange={handleToolbarZoom}
+        onZoomIn={zoomIn}
+        onZoomOut={zoomOut}
         onToolChange={setActiveTool}
         onSignaturePopoverChange={setIsSignaturePopoverOpen}
         onSignatureCreated={handleSignatureCreated}
         onDownload={handleDownload}
-        onRasterize={handleRasterize}
-        onPrint={handlePrint}
-        onReset={onReset}
       />
 
       <div className="px-4 pt-4 pb-8">
         <PDFViewer
           ref={viewerRef}
           file={file}
-          scale={state.scale}
+          scale={baseScale}
           cssScale={cssScale}
-          isZooming={isZooming}
-          isCommitting={isCommitting}
           textAnnotations={state.textAnnotations}
           signatureAnnotations={state.signatureAnnotations}
           highlightAnnotations={state.highlightAnnotations}
@@ -522,6 +535,8 @@ export function PDFEditor({ file, onReset }: PDFEditorProps) {
           onSelectAnnotation={selectAnnotation}
           onSignaturePlaced={handleSignaturePlaced}
           onFormFieldChange={handleFormFieldChange}
+          onDocumentLoad={setTotalPages}
+          onCurrentPageChange={setCurrentPage}
         />
       </div>
 

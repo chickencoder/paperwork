@@ -15,6 +15,64 @@ interface UseTextSelectionOptions {
   enabled?: boolean;
 }
 
+/**
+ * Merge adjacent rectangles on the same line into single rectangles.
+ * This prevents individual word boxes from revealing word lengths in redactions.
+ */
+function mergeLineRects(rects: AnnotationRect[]): AnnotationRect[] {
+  if (rects.length <= 1) return rects;
+
+  // Sort by Y position (top to bottom), then by X (left to right)
+  const sorted = [...rects].sort((a, b) => {
+    // Consider rects on the same line if their Y positions are within a small threshold
+    const yThreshold = Math.min(a.height, b.height) * 0.5;
+    if (Math.abs(a.y - b.y) <= yThreshold) {
+      return a.x - b.x;
+    }
+    return a.y - b.y;
+  });
+
+  const merged: AnnotationRect[] = [];
+  let current: AnnotationRect | null = null;
+
+  for (const rect of sorted) {
+    if (!current) {
+      current = { ...rect };
+      continue;
+    }
+
+    // Check if this rect is on the same line as current
+    const yThreshold = Math.min(current.height, rect.height) * 0.5;
+    const sameLine = Math.abs(current.y - rect.y) <= yThreshold;
+
+    if (sameLine) {
+      // Merge: extend current rect to cover both
+      const minX = Math.min(current.x, rect.x);
+      const maxX = Math.max(current.x + current.width, rect.x + rect.width);
+      const minY = Math.min(current.y, rect.y);
+      const maxY = Math.max(current.y + current.height, rect.y + rect.height);
+
+      current = {
+        x: minX,
+        y: minY,
+        width: maxX - minX,
+        height: maxY - minY,
+      };
+    } else {
+      // Different line - push current and start new
+      merged.push(current);
+      current = { ...rect };
+    }
+  }
+
+  // Don't forget the last one
+  if (current) {
+    merged.push(current);
+  }
+
+  return merged;
+}
+
 export function useTextSelection({
   containerRef,
   scale,
@@ -93,6 +151,9 @@ export function useTextSelection({
         height: rect.height / scale,
       }));
 
+      // Merge adjacent rects on the same line to create solid blocks
+      const mergedRects = mergeLineRects(normalizedRects);
+
       // Calculate toolbar position (centered above the first rect, in viewport coords)
       const firstRect = validRects[0];
       const toolbarPosition = {
@@ -103,7 +164,7 @@ export function useTextSelection({
       setSelection({
         text: windowSelection.toString(),
         pageIndex,
-        rects: normalizedRects,
+        rects: mergedRects,
         toolbarPosition,
       });
     };

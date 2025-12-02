@@ -1,11 +1,14 @@
+"use client";
+
 import { useState, useEffect, useRef, useCallback } from "react";
-import { X } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SignatureAnnotation } from "@/lib/pdf/types";
 
 interface SignatureAnnotationOverlayProps {
   annotation: SignatureAnnotation;
   scale: number;
+  cssScale?: number;
   isSelected: boolean;
   onSelect: () => void;
   onUpdate: (updates: Partial<Omit<SignatureAnnotation, "id" | "page" | "dataUrl">>) => void;
@@ -15,6 +18,7 @@ interface SignatureAnnotationOverlayProps {
 export function SignatureAnnotationOverlay({
   annotation,
   scale,
+  cssScale = 1,
   isSelected,
   onSelect,
   onUpdate,
@@ -28,6 +32,9 @@ export function SignatureAnnotationOverlay({
 
   const aspectRatio = annotation.width / annotation.height;
 
+  // Effective scale combines the PDF render scale and CSS transform scale
+  const effectiveScale = scale * cssScale;
+
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
       if (isResizing) return;
@@ -36,11 +43,11 @@ export function SignatureAnnotationOverlay({
       onSelect();
       setIsDragging(true);
       setDragStart({
-        x: e.clientX - annotation.position.x * scale,
-        y: e.clientY - annotation.position.y * scale,
+        x: e.clientX - annotation.position.x * effectiveScale,
+        y: e.clientY - annotation.position.y * effectiveScale,
       });
     },
-    [isResizing, annotation.position, scale, onSelect]
+    [isResizing, annotation.position, effectiveScale, onSelect]
   );
 
   const handleResizeMouseDown = useCallback(
@@ -63,8 +70,8 @@ export function SignatureAnnotationOverlay({
     if (!isDragging) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      const newX = (e.clientX - dragStart.x) / scale;
-      const newY = (e.clientY - dragStart.y) / scale;
+      const newX = (e.clientX - dragStart.x) / effectiveScale;
+      const newY = (e.clientY - dragStart.y) / effectiveScale;
       onUpdate({ position: { x: Math.max(0, newX), y: Math.max(0, newY) } });
     };
 
@@ -79,15 +86,15 @@ export function SignatureAnnotationOverlay({
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [isDragging, dragStart, scale, onUpdate]);
+  }, [isDragging, dragStart, effectiveScale, onUpdate]);
 
   // Handle resizing (maintain aspect ratio)
   useEffect(() => {
     if (!isResizing) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      const deltaX = (e.clientX - resizeStart.x) / scale;
-      const deltaY = (e.clientY - resizeStart.y) / scale;
+      const deltaX = (e.clientX - resizeStart.x) / effectiveScale;
+      const deltaY = (e.clientY - resizeStart.y) / effectiveScale;
 
       // Use the larger delta to determine resize amount
       const delta = Math.abs(deltaX) > Math.abs(deltaY) ? deltaX : deltaY;
@@ -109,7 +116,7 @@ export function SignatureAnnotationOverlay({
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [isResizing, resizeStart, scale, aspectRatio, onUpdate]);
+  }, [isResizing, resizeStart, effectiveScale, aspectRatio, onUpdate]);
 
   return (
     <div
@@ -118,7 +125,7 @@ export function SignatureAnnotationOverlay({
       className={cn(
         "absolute group",
         "transition-shadow duration-200",
-        isSelected && "ring-2 ring-amber-400 rounded"
+        isSelected && "ring-2 ring-ring rounded"
       )}
       style={{
         left: annotation.position.x * scale,
@@ -152,15 +159,21 @@ export function SignatureAnnotationOverlay({
           }}
           onMouseDown={(e) => e.stopPropagation()}
           className={cn(
-            "absolute -top-8 left-1/2 -translate-x-1/2",
+            "absolute left-1/2",
             "flex items-center gap-1 px-2 py-1",
-            "bg-white rounded-md shadow-lg border border-stone-200",
-            "text-stone-600 hover:text-red-600 hover:bg-red-50",
+            "bg-popover rounded-md shadow-lg border border-border",
+            "text-muted-foreground hover:text-destructive hover:bg-destructive/10",
             "transition-colors z-50"
           )}
+          style={{
+            bottom: "100%",
+            marginBottom: 8 / cssScale,
+            transform: `translateX(-50%) scale(${1 / cssScale})`,
+            transformOrigin: "center bottom",
+          }}
           title="Delete signature"
         >
-          <X className="w-3.5 h-3.5" />
+          <Trash2 className="w-3.5 h-3.5" />
         </button>
       )}
 
@@ -169,13 +182,19 @@ export function SignatureAnnotationOverlay({
         <div
           onMouseDown={handleResizeMouseDown}
           className={cn(
-            "absolute -bottom-1.5 -right-1.5",
+            "absolute",
             "w-4 h-4 rounded-full",
-            "bg-amber-400 hover:bg-amber-500",
+            "bg-primary hover:bg-primary/80",
             "cursor-se-resize",
             "transition-colors",
-            "border-2 border-white shadow"
+            "border-2 border-background shadow"
           )}
+          style={{
+            bottom: -6 / cssScale,
+            right: -6 / cssScale,
+            transform: `scale(${1 / cssScale})`,
+            transformOrigin: "center center",
+          }}
         />
       )}
     </div>

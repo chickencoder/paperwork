@@ -1,3 +1,5 @@
+"use client";
+
 import { useRef, useEffect, useCallback, useState } from "react";
 import { cn } from "@/lib/utils";
 
@@ -28,7 +30,10 @@ export function SignatureDrawPad({ onSignatureChange }: SignatureDrawPadProps) {
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
       ctx.lineWidth = 2;
-      ctx.strokeStyle = "#1c1917"; // stone-900
+      // Use CSS variable value or fallback to dark color for signature
+      ctx.strokeStyle = getComputedStyle(document.documentElement)
+        .getPropertyValue('--foreground')
+        .trim() || "#0a0a0a";
     }
   }, []);
 
@@ -116,8 +121,8 @@ export function SignatureDrawPad({ onSignatureChange }: SignatureDrawPadProps) {
     <div className="space-y-3">
       <div
         className={cn(
-          "relative border-2 border-dashed border-stone-300 rounded-lg",
-          "bg-white cursor-crosshair overflow-hidden"
+          "relative border-2 border-dashed border-border rounded-lg",
+          "bg-card cursor-crosshair overflow-hidden"
         )}
       >
         <canvas
@@ -133,7 +138,7 @@ export function SignatureDrawPad({ onSignatureChange }: SignatureDrawPadProps) {
         />
         {!hasDrawn && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <span className="text-stone-400 text-sm font-body">
+            <span className="text-muted-foreground text-sm">
               Draw your signature here
             </span>
           </div>
@@ -143,7 +148,7 @@ export function SignatureDrawPad({ onSignatureChange }: SignatureDrawPadProps) {
         <button
           type="button"
           onClick={clear}
-          className="text-sm text-stone-500 hover:text-stone-700 font-body"
+          className="text-sm text-muted-foreground hover:text-foreground"
         >
           Clear and start over
         </button>
