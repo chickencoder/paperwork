@@ -19,6 +19,7 @@ import { UnlockPdfWindow } from "@/components/micro-apps/windows/unlock-pdf-wind
 import { FlattenPdfWindow } from "@/components/micro-apps/windows/flatten-pdf-window";
 import { SplitPdfWindow } from "@/components/micro-apps/windows/split-pdf-window";
 import { RotatePdfWindow } from "@/components/micro-apps/windows/rotate-pdf-window";
+import { OcrPdfWindow } from "@/components/micro-apps/windows/ocr-pdf-window";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -653,6 +654,12 @@ export function PDFEditor({
           const newFile = new File([new Uint8Array(newBytes)], file.name, { type: "application/pdf" });
           setPdf(newFile, newBytes);
         }}
+      />
+      <OcrPdfWindow
+        open={activeMicroApp === "ocr-pdf"}
+        onClose={() => setActiveMicroApp(null)}
+        pdfBytes={state.pdfBytes}
+        fileName={file.name}
       />
 
       {/* Download error dialog */}

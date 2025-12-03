@@ -286,7 +286,7 @@ function EditorContent({
 
   // Has tabs: show editor with tab bar (only when multiple tabs)
   return (
-    <div className="min-h-screen bg-background flex flex-col overscroll-none">
+    <div className="min-h-screen bg-background flex flex-col overscroll-none-safe">
       {orderedTabs.length > 1 && (
         <TabBar
           tabs={orderedTabs}

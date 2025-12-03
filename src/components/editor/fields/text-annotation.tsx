@@ -292,8 +292,8 @@ export function TextAnnotationOverlay({
         <div
           className={cn(
             "absolute left-1/2",
-            "flex items-center gap-0.5 px-1 py-0.5",
-            "bg-popover rounded-md shadow-lg border border-border",
+            "flex items-center gap-1 px-2 py-1",
+            "bg-popover rounded-full shadow-lg border border-border",
             "z-50"
           )}
           style={{
@@ -308,185 +308,22 @@ export function TextAnnotationOverlay({
           onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Font size controls */}
-          <button
-            type="button"
-            onClick={decreaseFontSize}
-            className={cn(
-              "p-1 rounded hover:bg-accent",
-              "text-muted-foreground hover:text-foreground",
-              "transition-colors"
-            )}
-            title="Decrease font size"
-          >
-            <Minus className="w-3 h-3" />
-          </button>
-          <span className="text-xs text-muted-foreground w-6 text-center font-body">
-            {annotation.fontSize}
-          </span>
-          <button
-            type="button"
-            onClick={increaseFontSize}
-            className={cn(
-              "p-1 rounded hover:bg-accent",
-              "text-muted-foreground hover:text-foreground",
-              "transition-colors"
-            )}
-            title="Increase font size"
-          >
-            <Plus className="w-3 h-3" />
-          </button>
-
-          <div className="w-px h-4 bg-border mx-0.5" />
-
-          {/* Bold and Italic toggles */}
-          <button
-            type="button"
-            onClick={toggleBold}
-            className={cn(
-              "p-1 rounded hover:bg-accent",
-              "transition-colors",
-              annotation.fontWeight === "bold"
-                ? "bg-accent text-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-            title="Toggle bold"
-          >
-            <Bold className="w-3 h-3" />
-          </button>
-          <button
-            type="button"
-            onClick={toggleItalic}
-            className={cn(
-              "p-1 rounded hover:bg-accent",
-              "transition-colors",
-              fontStyle === "italic"
-                ? "bg-accent text-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-            title="Toggle italic"
-          >
-            <Italic className="w-3 h-3" />
-          </button>
-
-          <div className="w-px h-4 bg-border mx-0.5" />
-
-          {/* Color picker */}
-          <div className="relative" ref={colorPickerRef}>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowColorPicker(!showColorPicker);
-              }}
-              className={cn(
-                "flex items-center gap-0.5 p-1 rounded hover:bg-accent",
-                "text-muted-foreground hover:text-foreground",
-                "transition-colors"
-              )}
-              title="Text color"
-            >
-              <div
-                className="w-3 h-3 rounded-full border border-border"
-                style={{ backgroundColor: getColorHex(color) }}
-              />
-              <ChevronDown className="w-2 h-2" />
-            </button>
-
-            {showColorPicker && (
-              <div
-                className={cn(
-                  "absolute top-full left-0 mt-1 p-2",
-                  "bg-popover rounded-lg shadow-lg border border-border",
-                  "z-[60]"
-                )}
-                onMouseDown={(e) => e.stopPropagation()}
-              >
-                <div className="grid grid-cols-6 gap-1.5">
-                  {TEXT_COLOR_OPTIONS.map(({ color: c, hex, label }) => (
-                    <button
-                      key={c}
-                      type="button"
-                      className={cn(
-                        "w-5 h-5 rounded-full transition-transform hover:scale-110",
-                        color === c && "ring-2 ring-ring ring-offset-1 ring-offset-popover"
-                      )}
-                      style={{ backgroundColor: hex }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setColor(c);
-                      }}
-                      title={label}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="w-px h-4 bg-border mx-0.5" />
-
-          {/* Text alignment */}
-          <div className="flex items-center rounded border border-border">
-            <button
-              type="button"
-              onClick={setAlignment("left")}
-              className={cn(
-                "p-1 transition-colors",
-                textAlign === "left"
-                  ? "bg-accent text-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-              )}
-              title="Align left"
-            >
-              <AlignLeft className="w-3 h-3" />
-            </button>
-            <button
-              type="button"
-              onClick={setAlignment("center")}
-              className={cn(
-                "p-1 border-x border-border transition-colors",
-                textAlign === "center"
-                  ? "bg-accent text-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-              )}
-              title="Align center"
-            >
-              <AlignCenter className="w-3 h-3" />
-            </button>
-            <button
-              type="button"
-              onClick={setAlignment("right")}
-              className={cn(
-                "p-1 transition-colors",
-                textAlign === "right"
-                  ? "bg-accent text-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-              )}
-              title="Align right"
-            >
-              <AlignRight className="w-3 h-3" />
-            </button>
-          </div>
-
-          <div className="w-px h-4 bg-border mx-0.5" />
-
           {/* Font family picker */}
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
                 className={cn(
-                  "flex items-center gap-0.5 px-1.5 py-1 rounded hover:bg-accent",
+                  "flex items-center gap-1 px-2 py-1.5 rounded-full hover:bg-accent",
                   "text-muted-foreground hover:text-foreground",
-                  "transition-colors text-xs"
+                  "transition-colors text-sm"
                 )}
                 style={{ fontFamily: getFontFamilyCss(fontFamily) }}
                 title="Font family"
                 onPointerDown={(e) => e.stopPropagation()}
               >
-                <Type className="w-3 h-3" />
-                <ChevronDown className="w-2 h-2" />
+                <Type className="w-4 h-4" />
+                <ChevronDown className="w-3 h-3" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
@@ -508,7 +345,168 @@ export function TextAnnotationOverlay({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <div className="w-px h-4 bg-border mx-0.5" />
+          {/* Font size controls */}
+          <button
+            type="button"
+            onClick={decreaseFontSize}
+            className={cn(
+              "p-1.5 rounded-full hover:bg-accent",
+              "text-muted-foreground hover:text-foreground",
+              "transition-colors"
+            )}
+            title="Decrease font size"
+          >
+            <Minus className="w-4 h-4" />
+          </button>
+          <span className="text-sm text-muted-foreground w-7 text-center font-body">
+            {annotation.fontSize}
+          </span>
+          <button
+            type="button"
+            onClick={increaseFontSize}
+            className={cn(
+              "p-1.5 rounded-full hover:bg-accent",
+              "text-muted-foreground hover:text-foreground",
+              "transition-colors"
+            )}
+            title="Increase font size"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+
+          <div className="w-px h-5 bg-border mx-1" />
+
+          {/* Bold and Italic toggles */}
+          <button
+            type="button"
+            onClick={toggleBold}
+            className={cn(
+              "p-1.5 rounded-full hover:bg-accent",
+              "transition-colors",
+              annotation.fontWeight === "bold"
+                ? "bg-accent text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+            title="Toggle bold"
+          >
+            <Bold className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={toggleItalic}
+            className={cn(
+              "p-1.5 rounded-full hover:bg-accent",
+              "transition-colors",
+              fontStyle === "italic"
+                ? "bg-accent text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+            title="Toggle italic"
+          >
+            <Italic className="w-4 h-4" />
+          </button>
+
+          <div className="w-px h-5 bg-border mx-1" />
+
+          {/* Color picker */}
+          <div className="relative" ref={colorPickerRef}>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowColorPicker(!showColorPicker);
+              }}
+              className={cn(
+                "flex items-center gap-1 p-1.5 rounded-full hover:bg-accent",
+                "text-muted-foreground hover:text-foreground",
+                "transition-colors"
+              )}
+              title="Text color"
+            >
+              <div
+                className="w-4 h-4 rounded-full border border-border"
+                style={{ backgroundColor: getColorHex(color) }}
+              />
+              <ChevronDown className="w-3 h-3" />
+            </button>
+
+            {showColorPicker && (
+              <div
+                className={cn(
+                  "absolute top-full left-0 mt-1 p-3",
+                  "bg-popover rounded-xl shadow-lg border border-border",
+                  "z-[60]"
+                )}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                <div className="grid grid-cols-6 gap-2" style={{ width: 156 }}>
+                  {TEXT_COLOR_OPTIONS.map(({ color: c, hex, label }) => (
+                    <button
+                      key={c}
+                      type="button"
+                      className={cn(
+                        "w-5 h-5 rounded-full transition-transform hover:scale-110",
+                        color === c && "ring-2 ring-ring ring-offset-1 ring-offset-popover"
+                      )}
+                      style={{ backgroundColor: hex }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setColor(c);
+                      }}
+                      title={label}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="w-px h-5 bg-border mx-1" />
+
+          {/* Text alignment */}
+          <div className="flex items-center rounded-full border border-border">
+            <button
+              type="button"
+              onClick={setAlignment("left")}
+              className={cn(
+                "p-1.5 rounded-l-full transition-colors",
+                textAlign === "left"
+                  ? "bg-accent text-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+              )}
+              title="Align left"
+            >
+              <AlignLeft className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={setAlignment("center")}
+              className={cn(
+                "p-1.5 border-x border-border transition-colors",
+                textAlign === "center"
+                  ? "bg-accent text-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+              )}
+              title="Align center"
+            >
+              <AlignCenter className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={setAlignment("right")}
+              className={cn(
+                "p-1.5 rounded-r-full transition-colors",
+                textAlign === "right"
+                  ? "bg-accent text-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+              )}
+              title="Align right"
+            >
+              <AlignRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="w-px h-5 bg-border mx-1" />
 
           {/* Delete button */}
           <button
@@ -518,13 +516,13 @@ export function TextAnnotationOverlay({
               onRemove();
             }}
             className={cn(
-              "p-1 rounded hover:bg-destructive/10",
+              "p-1.5 rounded-full hover:bg-destructive/10",
               "text-muted-foreground hover:text-destructive",
               "transition-colors"
             )}
             title="Delete"
           >
-            <Trash2 className="w-3 h-3" />
+            <Trash2 className="w-4 h-4" />
           </button>
         </div>
       )}
@@ -539,7 +537,7 @@ export function TextAnnotationOverlay({
           onMouseDown={(e) => e.stopPropagation()}
           className={cn(
             "min-w-[100px] px-1 py-0.5 resize-none",
-            "bg-accent border border-ring",
+            "bg-transparent border border-ring",
             "outline-none",
             "rounded-sm shadow-sm"
           )}
@@ -561,8 +559,8 @@ export function TextAnnotationOverlay({
           className={cn(
             "relative px-1 py-0.5 rounded-sm",
             "transition-all duration-150",
-            "hover:bg-accent/80",
-            isSelected && "bg-accent ring-2 ring-ring",
+            "hover:bg-primary/10",
+            isSelected && "bg-primary/10 ring-2 ring-ring",
             isDragging && "opacity-80"
           )}
           style={{
@@ -586,7 +584,7 @@ export function TextAnnotationOverlay({
                 "bg-primary hover:bg-primary/80",
                 "cursor-ew-resize",
                 "transition-colors",
-                "border-2 border-background shadow"
+                "border-2 border-white shadow"
               )}
               style={{
                 right: -6 / cssScale,

@@ -2,12 +2,15 @@
 
 import { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { nanoid } from "nanoid";
-import { Upload } from "lucide-react";
+import { Upload, ArrowRight, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { savePendingPdf } from "@/lib/storage/persistence";
+import { ToolsNavigation } from "./tools-dropdown";
 import type { LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
 
 // Transition state interface for cross-page animation coordination
 export interface TransitionState {
@@ -22,7 +25,6 @@ export interface TransitionState {
 }
 
 // Generate a session ID for the editor URL
-// Using 21 characters for better entropy (default nanoid length)
 export function generateSessionId(): string {
   return `session-${nanoid(21)}`;
 }
@@ -39,15 +41,18 @@ export interface ToolLandingConfig {
   buttonText: string;
   buttonTextDragging?: string;
   features: ToolFeature[];
-  tool?: string; // Tool query param to pass to the editor
+  tool?: string;
+  eyebrow?: string | null; // Custom eyebrow text, null to hide, undefined for default
 }
 
 export function ToolLandingDialog({
   config,
   onTransitionStart,
+  heroVisual,
 }: {
   config: ToolLandingConfig;
   onTransitionStart?: () => void;
+  heroVisual?: ReactNode;
 }) {
   const router = useRouter();
   const [isDragOver, setIsDragOver] = useState(false);
@@ -67,10 +72,8 @@ export function ToolLandingDialog({
       const file = pdfFiles[0];
 
       try {
-        // Generate a new session ID for this editing session
         const sessionId = generateSessionId();
 
-        // Capture dialog position for transition animation
         const rect = dialogCardRef.current?.getBoundingClientRect();
         const transitionState: TransitionState = {
           fromHomepage: true,
@@ -86,20 +89,17 @@ export function ToolLandingDialog({
         };
         sessionStorage.setItem("transitionState", JSON.stringify(transitionState));
 
-        // Start exit animation
         setIsTransitioning(true);
         onTransitionStart?.();
 
         const bytes = await file.arrayBuffer();
 
-        // Save to IndexedDB (avoids sessionStorage quota limits for large PDFs)
         await savePendingPdf({
           sessionId,
           name: file.name,
           bytes: new Uint8Array(bytes),
         });
 
-        // Delay navigation to allow exit animation to play
         setTimeout(() => {
           const toolParam = config.tool ? `?tool=${config.tool}` : "";
           router.push(`/editor/${sessionId}${toolParam}`);
@@ -109,7 +109,7 @@ export function ToolLandingDialog({
         setIsTransitioning(false);
       }
     },
-    [router, onTransitionStart]
+    [router, onTransitionStart, config.tool]
   );
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
@@ -162,6 +162,16 @@ export function ToolLandingDialog({
     [handleFiles]
   );
 
+  // Default visual - the lark image
+  const defaultVisual = (
+    <div className="relative w-full h-full min-h-[400px] lg:min-h-[500px]">
+      <div
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat rounded-2xl"
+        style={{ backgroundImage: "url('/lark.png')" }}
+      />
+    </div>
+  );
+
   return (
     <AnimatePresence>
       {!isTransitioning && (
@@ -169,102 +179,156 @@ export function ToolLandingDialog({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4"
+          transition={{ duration: 0.3 }}
+          className="relative z-40 min-h-screen bg-background"
+          onDragEnter={handleDragEnter}
+          onDragLeave={handleDragLeave}
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
         >
-          {/* Logo - centered at top */}
-          <motion.h2
+          {/* Floating Header Bar */}
+          <motion.header
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ type: "spring", duration: 0.5, bounce: 0.2 }}
-            className="absolute top-8 text-3xl text-white font-medium"
-            style={{
-              fontFamily: "'Fraunces', serif",
-              letterSpacing: "-0.02em",
-            }}
+            transition={{ delay: 0.1, duration: 0.5 }}
+            className="fixed top-4 left-0 right-0 z-50 px-6 lg:px-12"
           >
-            Paperwork
-          </motion.h2>
+            <div className="w-full max-w-7xl mx-auto flex items-center justify-between bg-popover/90 backdrop-blur-md rounded-full shadow-md shadow-black/5 dark:shadow-black/20 border border-border/60 px-6 py-3">
+              {/* Logo */}
+              <Link href="/" className="px-2">
+                <span
+                  className="text-xl sm:text-2xl text-foreground font-medium"
+                  style={{
+                    fontFamily: "'Fraunces', serif",
+                    letterSpacing: "-0.02em",
+                  }}
+                >
+                  Paperwork
+                </span>
+              </Link>
 
-          {/* A4 Page style dialog */}
-          <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, scale: 1.02, transition: { duration: 0.25, ease: "easeIn" } }}
-            transition={{ type: "spring", duration: 0.5, bounce: 0.2 }}
-            className="relative z-10 w-full max-w-[500px]"
-            onDragEnter={handleDragEnter}
-            onDragLeave={handleDragLeave}
-            onDragOver={handleDragOver}
-            onDrop={handleDrop}
-          >
-            <div
-              ref={dialogCardRef}
-              className={`
-                bg-white rounded-sm shadow-2xl overflow-hidden
-                transition-all duration-200 ease-out
-                ${isDragOver ? "ring-2 ring-primary ring-offset-2 scale-[1.01]" : ""}
-              `}
-              style={{
-                aspectRatio: "1 / 1.2",
-              }}
-            >
-              <motion.div
-                className="h-full flex flex-col justify-between p-10 sm:p-12"
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.15 }}
-              >
-                {/* Header section */}
-                <div>
-                  <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-gray-900 mb-4">
-                    {config.headline}
-                  </h1>
-                  <p className="text-gray-600 text-base leading-relaxed">
-                    {config.description}
-                  </p>
-                </div>
-
-                {/* CTA section */}
-                <div className="-mt-6 -mb-4">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="application/pdf"
-                    className="hidden"
-                    onChange={handleFileInputChange}
-                    aria-hidden="true"
-                  />
-                  <Button
-                    size="lg"
-                    className="text-base"
-                    onClick={handleClick}
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    {isDragOver ? (config.buttonTextDragging || "Drop to open") : config.buttonText}
-                  </Button>
-                  <p className="text-xs text-gray-400 mt-2">
-                    or drag and drop a file anywhere on this page
-                  </p>
-                </div>
-
-                {/* Features section */}
-                <div className="space-y-4">
-                  {config.features.map((feature, index) => (
-                    <div key={index} className="flex items-start gap-3">
-                      <div className="mt-0.5 p-1.5 rounded-md bg-gray-100">
-                        <feature.icon className="w-4 h-4 text-gray-600" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900 text-sm">{feature.title}</p>
-                        <p className="text-gray-500 text-sm">{feature.description}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </motion.div>
+              {/* Category dropdowns */}
+              <ToolsNavigation />
             </div>
-          </motion.div>
+          </motion.header>
+
+          {/* Main content - Two column hero */}
+          <div className="min-h-screen flex items-center">
+            <div className="w-full max-w-7xl mx-auto px-6 lg:px-12 pt-24 pb-12">
+              <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+
+                {/* Left column - Content */}
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.15, duration: 0.6 }}
+                  ref={dialogCardRef}
+                >
+                  {/* Eyebrow */}
+                  {config.eyebrow !== null && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.2, duration: 0.5 }}
+                    >
+                      <span className="inline-block px-3 py-1 text-[10px] font-medium tracking-[0.2em] uppercase text-muted-foreground border border-border rounded-full mb-6">
+                        {config.eyebrow ?? "Free PDF Tool"}
+                      </span>
+                    </motion.div>
+                  )}
+
+                  {/* Headline */}
+                  <motion.h1
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.25, duration: 0.5 }}
+                    className="text-5xl sm:text-6xl lg:text-7xl font-medium text-foreground mb-6 tracking-tight leading-[1.1]"
+                    style={{ fontFamily: "'Fraunces', serif" }}
+                  >
+                    {config.headline}
+                  </motion.h1>
+
+                  {/* Description */}
+                  <motion.p
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3, duration: 0.5 }}
+                    className="text-lg text-muted-foreground leading-relaxed mb-8 max-w-md"
+                  >
+                    {config.description}
+                  </motion.p>
+
+                  {/* CTA Button */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.35, duration: 0.5 }}
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="application/pdf"
+                      className="hidden"
+                      onChange={handleFileInputChange}
+                      aria-hidden="true"
+                    />
+                    <Button
+                      size="lg"
+                      onClick={handleClick}
+                      className={`
+                        group relative overflow-hidden
+                        px-8 py-6 text-base font-medium rounded-full
+                        transition-all duration-300
+                        ${isDragOver ? "ring-2 ring-primary ring-offset-2 ring-offset-background scale-[1.02]" : ""}
+                      `}
+                    >
+                      <span className="relative z-10 flex items-center gap-3">
+                        <Upload className="w-5 h-5" />
+                        {isDragOver ? (config.buttonTextDragging || "Drop to open") : config.buttonText}
+                        <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                      </span>
+                    </Button>
+                    <p className="text-sm text-muted-foreground/70 mt-4">
+                      or drag and drop anywhere on this page
+                    </p>
+                  </motion.div>
+
+                  {/* Features */}
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.5, duration: 0.6 }}
+                    className="flex flex-wrap gap-3 mt-10"
+                  >
+                    {config.features.map((feature, index) => (
+                      <motion.div
+                        key={index}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.55 + index * 0.08, duration: 0.4 }}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 bg-muted/50 border border-border rounded-full"
+                      >
+                        <div className="w-4 h-4 rounded-full bg-muted flex items-center justify-center">
+                          <Check className="w-2.5 h-2.5 text-muted-foreground" />
+                        </div>
+                        <span className="text-xs text-muted-foreground">{feature.title}</span>
+                      </motion.div>
+                    ))}
+                  </motion.div>
+                </motion.div>
+
+                {/* Right column - Visual */}
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.3, duration: 0.6 }}
+                  className="relative"
+                >
+                  {heroVisual || defaultVisual}
+                </motion.div>
+              </div>
+            </div>
+          </div>
         </motion.div>
       )}
     </AnimatePresence>

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ThemeProvider } from "next-themes";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { ConvexClientProvider } from "@/components/convex-client-provider";
 import "./globals.css";
@@ -22,6 +23,18 @@ export const metadata: Metadata = {
     "browser PDF editor",
   ],
   authors: [{ name: "Paperwork" }],
+  icons: {
+    icon: [
+      {
+        url: "/favicon-light.png",
+        media: "(prefers-color-scheme: light)",
+      },
+      {
+        url: "/favicon-dark.png",
+        media: "(prefers-color-scheme: dark)",
+      },
+    ],
+  },
   openGraph: {
     title: "Free PDF Editor - Edit PDFs Online | Paperwork",
     description:
@@ -47,7 +60,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
@@ -88,11 +101,24 @@ export default function RootLayout({
             }),
           }}
         />
+        {/* Detect Safari and add class to html for conditional CSS */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){var ua=navigator.userAgent;if(ua.indexOf('Safari')>-1&&ua.indexOf('Chrome')===-1&&ua.indexOf('Chromium')===-1){document.documentElement.classList.add('safari')}})()`,
+          }}
+        />
       </head>
       <body className="antialiased">
-        <ConvexClientProvider>
-          <NuqsAdapter>{children}</NuqsAdapter>
-        </ConvexClientProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <ConvexClientProvider>
+            <NuqsAdapter>{children}</NuqsAdapter>
+          </ConvexClientProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

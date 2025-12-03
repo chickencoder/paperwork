@@ -65,7 +65,7 @@ export function DraggableWindow({
             style={{ width }}
             className={cn(
               "fixed top-20 right-16",
-              "z-[101] bg-popover rounded-2xl shadow-2xl shadow-black/20",
+              "z-[101] bg-popover rounded-2xl shadow-2xl shadow-black/25 dark:shadow-black/50",
               "border border-border/60 overflow-hidden",
               "flex flex-col",
               className

@@ -1,33 +1,42 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
-import { LandingDialog } from "@/components/landing/landing-dialog";
+import { Shield, Sparkles, Zap } from "lucide-react";
+import { ToolLandingDialog, type ToolLandingConfig } from "@/components/landing/tool-landing-dialog";
+import { HomepageContent } from "@/components/landing/homepage-content";
+import { Footer } from "@/components/landing/footer";
+import { HomepageHeroVisual } from "@/components/landing/hero-visuals";
 
-export default function LandingPage() {
+const homepageConfig: ToolLandingConfig = {
+  headline: "AI-Powered PDF Editor",
+  description: "Edit, sign, and transform your documents with intelligent tools that understand your content. Runs entirely in your browser—your files never leave your device.",
+  buttonText: "Open PDF",
+  buttonTextDragging: "Drop to open",
+  eyebrow: "Free & Private",
+  features: [
+    { icon: Sparkles, title: "AI-Powered", description: "Smart tools that understand your documents" },
+    { icon: Shield, title: "100% Private", description: "Files never leave your device" },
+    { icon: Zap, title: "No Signup", description: "Start editing immediately" },
+  ],
+};
+
+export default function HomePage() {
   const [isTransitioning, setIsTransitioning] = useState(false);
 
   return (
-    <main className="relative min-h-screen">
-      {/* Background image */}
-      <motion.div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: "url('/lark.png')" }}
-        initial={{ opacity: 1 }}
-        animate={{ opacity: isTransitioning ? 0 : 1 }}
-        transition={{ duration: 0.2 }}
+    <main className="relative">
+      <ToolLandingDialog
+        config={homepageConfig}
+        onTransitionStart={() => setIsTransitioning(true)}
+        heroVisual={<HomepageHeroVisual />}
       />
 
-      {/* Dark overlay for better contrast */}
-      <motion.div
-        className="absolute inset-0 bg-black/30"
-        initial={{ opacity: 1 }}
-        animate={{ opacity: isTransitioning ? 0 : 1 }}
-        transition={{ duration: 0.2 }}
-      />
-
-      {/* Landing dialog overlay */}
-      <LandingDialog onTransitionStart={() => setIsTransitioning(true)} />
+      {!isTransitioning && (
+        <>
+          <HomepageContent />
+          <Footer />
+        </>
+      )}
     </main>
   );
 }

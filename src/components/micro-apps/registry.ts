@@ -1,10 +1,10 @@
 import {
   FileArchive,
-  Languages,
   Scissors,
   LockOpen,
   FileOutput,
   RotateCw,
+  ScanText,
 } from "lucide-react";
 import { MicroApp } from "./types";
 
@@ -21,15 +21,6 @@ export const microApps: MicroApp[] = [
     category: "transform",
     requiresDocument: true,
     keywords: ["shrink", "reduce", "size", "smaller", "optimize"],
-  },
-  {
-    id: "translate-pdf",
-    name: "Translate PDF",
-    description: "Translate document to another language",
-    icon: Languages,
-    category: "transform",
-    requiresDocument: true,
-    keywords: ["language", "convert", "localize", "translation"],
   },
   {
     id: "split-pdf",
@@ -66,6 +57,15 @@ export const microApps: MicroApp[] = [
     category: "organize",
     requiresDocument: true,
     keywords: ["turn", "orientation", "landscape", "portrait"],
+  },
+  {
+    id: "ocr-pdf",
+    name: "Extract Text (OCR)",
+    description: "Extract text from scanned PDFs using OCR",
+    icon: ScanText,
+    category: "convert",
+    requiresDocument: true,
+    keywords: ["ocr", "text", "extract", "scan", "recognize", "image", "scanned"],
   },
 ];
 

@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
-import { Minimize2, Shield, Zap } from "lucide-react";
+import { Minimize2, Shield, Zap, Layers, PenLine, Scissors } from "lucide-react";
 import { ToolLandingDialog, type ToolLandingConfig } from "@/components/landing/tool-landing-dialog";
+import { SEOContent, type HowToStep, type FAQItem, type RelatedTool } from "@/components/landing/seo-content";
+import { Footer } from "@/components/landing/footer";
+import { CompressPdfHeroVisual } from "@/components/landing/hero-visuals";
 
 const compressPdfConfig: ToolLandingConfig = {
   headline: "Compress PDF",
@@ -31,33 +33,72 @@ const compressPdfConfig: ToolLandingConfig = {
   ],
 };
 
+const howToSteps: HowToStep[] = [
+  {
+    title: "Upload your PDF",
+    description: "Click the button above or drag and drop the PDF file you want to compress.",
+  },
+  {
+    title: "Choose compression level",
+    description: "Select from Web (maximum compression), Standard (balanced), or Print (best quality) presets.",
+  },
+  {
+    title: "Download compressed PDF",
+    description: "Click compress and your smaller PDF will download automatically. Check the file size reduction!",
+  },
+];
+
+const faqs: FAQItem[] = [
+  {
+    question: "How do I compress a PDF file?",
+    answer: "Upload your PDF using the button above, choose your preferred compression level, and click compress. Your smaller PDF will download automatically.",
+  },
+  {
+    question: "Will compression affect my PDF quality?",
+    answer: "Our compression optimizes images and removes unnecessary data while preserving text clarity. The 'Print' preset maintains the highest quality, while 'Web' achieves maximum compression.",
+  },
+  {
+    question: "How much can I reduce my PDF file size?",
+    answer: "Depending on the content, you can reduce file sizes by up to 90%. PDFs with many images see the biggest reductions.",
+  },
+  {
+    question: "Is there a file size limit?",
+    answer: "No server-side limits since everything processes in your browser. Very large files may take longer to process depending on your device.",
+  },
+  {
+    question: "Is my PDF secure during compression?",
+    answer: "Yes, completely. Your files never leave your device—all compression happens locally in your browser. We don't upload or store anything.",
+  },
+];
+
+const relatedTools: RelatedTool[] = [
+  { name: "Merge PDF", href: "/merge-pdf", icon: Layers },
+  { name: "Edit PDF", href: "/edit-pdf", icon: PenLine },
+  { name: "Split PDF", href: "/split-pdf", icon: Scissors },
+];
+
 export default function CompressPdfPage() {
   const [isTransitioning, setIsTransitioning] = useState(false);
 
   return (
-    <main className="relative min-h-screen">
-      {/* Background image */}
-      <motion.div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: "url('/lark.png')" }}
-        initial={{ opacity: 1 }}
-        animate={{ opacity: isTransitioning ? 0 : 1 }}
-        transition={{ duration: 0.2 }}
-      />
-
-      {/* Dark overlay for better contrast */}
-      <motion.div
-        className="absolute inset-0 bg-black/30"
-        initial={{ opacity: 1 }}
-        animate={{ opacity: isTransitioning ? 0 : 1 }}
-        transition={{ duration: 0.2 }}
-      />
-
-      {/* Tool landing dialog */}
+    <main className="relative">
       <ToolLandingDialog
         config={compressPdfConfig}
         onTransitionStart={() => setIsTransitioning(true)}
+        heroVisual={<CompressPdfHeroVisual />}
       />
+
+      {!isTransitioning && (
+        <>
+          <SEOContent
+            toolName="Compress a PDF"
+            howToSteps={howToSteps}
+            faqs={faqs}
+            relatedTools={relatedTools}
+          />
+          <Footer />
+        </>
+      )}
     </main>
   );
 }

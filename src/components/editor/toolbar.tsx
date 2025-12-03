@@ -92,7 +92,7 @@ export function Toolbar({
           delay: isEntering ? 0.15 : 0,
         }}
       >
-        <div className="pointer-events-auto flex items-center gap-0.5 bg-popover/90 backdrop-blur-md rounded-full shadow-lg shadow-foreground/10 border border-border/60 px-1.5 py-1.5">
+        <div className="pointer-events-auto flex items-center gap-0.5 bg-popover/90 dark:bg-popover backdrop-blur-md rounded-full shadow-lg shadow-black/10 dark:shadow-black/30 border border-border/60 px-1.5 py-1.5">
           {/* Edit tools */}
           <ToolButton
             icon={<MousePointer2 className="w-4 h-4" />}

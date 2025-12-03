@@ -469,6 +469,7 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
                         key={annotation.id}
                         annotation={annotation}
                         scale={scale}
+                        cssScale={cssScale}
                         isSelected={selectedAnnotationId === annotation.id}
                         onSelect={() => onSelectAnnotation(annotation.id)}
                         onRemove={() => onRemoveHighlight(annotation.id)}
@@ -481,6 +482,7 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
                         key={annotation.id}
                         annotation={annotation}
                         scale={scale}
+                        cssScale={cssScale}
                         isSelected={selectedAnnotationId === annotation.id}
                         onSelect={() => onSelectAnnotation(annotation.id)}
                         onRemove={() => onRemoveStrikethrough(annotation.id)}
@@ -493,6 +495,7 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
                         key={annotation.id}
                         annotation={annotation}
                         scale={scale}
+                        cssScale={cssScale}
                         isSelected={selectedAnnotationId === annotation.id}
                         onSelect={() => onSelectAnnotation(annotation.id)}
                         onRemove={() => onRemoveRedaction(annotation.id)}

@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
-import { Layers, Shield, Zap } from "lucide-react";
+import { Layers, Shield, Zap, EyeOff, FileArchive, FormInput } from "lucide-react";
 import { ToolLandingDialog, type ToolLandingConfig } from "@/components/landing/tool-landing-dialog";
+import { SEOContent, type HowToStep, type FAQItem, type RelatedTool } from "@/components/landing/seo-content";
+import { Footer } from "@/components/landing/footer";
+import { FlattenPdfHeroVisual } from "@/components/landing/hero-visuals";
 
 const flattenPdfConfig: ToolLandingConfig = {
   headline: "Flatten PDF",
@@ -31,33 +33,72 @@ const flattenPdfConfig: ToolLandingConfig = {
   ],
 };
 
+const howToSteps: HowToStep[] = [
+  {
+    title: "Upload your PDF",
+    description: "Click the button above or drag and drop the PDF you want to flatten.",
+  },
+  {
+    title: "Review and flatten",
+    description: "Preview your document and click flatten to merge all layers, form fields, and annotations.",
+  },
+  {
+    title: "Download flattened PDF",
+    description: "Download your flattened PDF with all content merged into a single, uneditable layer.",
+  },
+];
+
+const faqs: FAQItem[] = [
+  {
+    question: "What does flattening a PDF do?",
+    answer: "Flattening merges all layers, form fields, annotations, and interactive elements into a single flat layer. The content becomes part of the page and cannot be edited.",
+  },
+  {
+    question: "Why would I flatten a PDF?",
+    answer: "Flatten PDFs to finalize documents, prevent future edits, ensure consistent printing, reduce file size, or prepare for archival.",
+  },
+  {
+    question: "Will flattening remove form fields?",
+    answer: "Yes, form fields become static content. The filled-in data remains visible but can no longer be edited.",
+  },
+  {
+    question: "Can I undo flattening?",
+    answer: "No, flattening is permanent. Keep a copy of your original PDF if you might need to edit it later.",
+  },
+  {
+    question: "Does flattening reduce file size?",
+    answer: "Often yes. Removing interactive elements and merging layers can reduce file size, especially for PDFs with many annotations or form fields.",
+  },
+];
+
+const relatedTools: RelatedTool[] = [
+  { name: "Redact PDF", href: "/redact-pdf", icon: EyeOff },
+  { name: "Compress PDF", href: "/compress-pdf", icon: FileArchive },
+  { name: "Fill PDF", href: "/fill-pdf", icon: FormInput },
+];
+
 export default function FlattenPdfPage() {
   const [isTransitioning, setIsTransitioning] = useState(false);
 
   return (
-    <main className="relative min-h-screen">
-      {/* Background image */}
-      <motion.div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: "url('/lark.png')" }}
-        initial={{ opacity: 1 }}
-        animate={{ opacity: isTransitioning ? 0 : 1 }}
-        transition={{ duration: 0.2 }}
-      />
-
-      {/* Dark overlay for better contrast */}
-      <motion.div
-        className="absolute inset-0 bg-black/30"
-        initial={{ opacity: 1 }}
-        animate={{ opacity: isTransitioning ? 0 : 1 }}
-        transition={{ duration: 0.2 }}
-      />
-
-      {/* Tool landing dialog */}
+    <main className="relative">
       <ToolLandingDialog
         config={flattenPdfConfig}
         onTransitionStart={() => setIsTransitioning(true)}
+        heroVisual={<FlattenPdfHeroVisual />}
       />
+
+      {!isTransitioning && (
+        <>
+          <SEOContent
+            toolName="Flatten a PDF"
+            howToSteps={howToSteps}
+            faqs={faqs}
+            relatedTools={relatedTools}
+          />
+          <Footer />
+        </>
+      )}
     </main>
   );
 }

@@ -16,6 +16,7 @@ const COLOR_MAP: Record<HighlightColor, string> = {
 interface HighlightOverlayProps {
   annotation: HighlightAnnotation;
   scale: number;
+  cssScale?: number;
   isSelected: boolean;
   onSelect: () => void;
   onRemove: () => void;
@@ -24,6 +25,7 @@ interface HighlightOverlayProps {
 export function HighlightOverlay({
   annotation,
   scale,
+  cssScale = 1,
   isSelected,
   onSelect,
   onRemove,
@@ -105,14 +107,16 @@ export function HighlightOverlay({
       {showControls && (
         <div
           className={cn(
-            "absolute pointer-events-auto -translate-x-1/2",
+            "absolute pointer-events-auto",
             "flex items-center justify-center",
-            "bg-popover rounded shadow-lg border border-border",
-            "w-5 h-5"
+            "bg-popover rounded-full shadow-lg border border-border",
+            "w-8 h-8"
           )}
           style={{
             left: centerX * scale,
-            top: bounds.minY * scale - 24,
+            top: bounds.minY * scale - 40 * cssScale,
+            transform: `translateX(-50%) scale(${1 / cssScale})`,
+            transformOrigin: "center bottom",
           }}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
@@ -125,13 +129,13 @@ export function HighlightOverlay({
             }}
             onMouseDown={(e) => e.stopPropagation()}
             className={cn(
-              "flex items-center justify-center w-full h-full rounded",
+              "flex items-center justify-center w-full h-full rounded-full",
               "text-muted-foreground hover:text-destructive hover:bg-destructive/10",
               "transition-colors"
             )}
             title="Delete"
           >
-            <Trash2 className="w-3 h-3" />
+            <Trash2 className="w-4 h-4" />
           </button>
         </div>
       )}

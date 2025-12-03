@@ -7,6 +7,7 @@ import { Upload, Shield, Sparkles, FileText } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { savePendingPdf } from "@/lib/storage/persistence";
+import { ToolsNavigation } from "./tools-dropdown";
 
 // Transition state interface for cross-page animation coordination
 export interface TransitionState {
@@ -168,20 +169,30 @@ export function LandingDialog({
           transition={{ duration: 0.2 }}
           className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4"
         >
-          {/* Logo - centered at top */}
-          <motion.h2
+          {/* Floating Header Bar */}
+          <motion.header
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ type: "spring", duration: 0.5, bounce: 0.2 }}
-            className="absolute top-8 text-3xl text-white font-medium"
-            style={{
-              fontFamily: "'Fraunces', serif",
-              letterSpacing: "-0.02em",
-            }}
+            className="fixed top-4 left-0 right-0 z-50 px-6 lg:px-12"
           >
-            Paperwork
-          </motion.h2>
+            <div className="w-full max-w-7xl mx-auto flex items-center justify-between bg-popover/90 backdrop-blur-md rounded-full shadow-md shadow-black/5 dark:shadow-black/20 border border-border/60 px-6 py-3">
+              {/* Logo */}
+              <span
+                className="px-2 text-xl sm:text-2xl text-foreground font-medium"
+                style={{
+                  fontFamily: "'Fraunces', serif",
+                  letterSpacing: "-0.02em",
+                }}
+              >
+                Paperwork
+              </span>
+
+              {/* Category dropdowns */}
+              <ToolsNavigation />
+            </div>
+          </motion.header>
 
           {/* A4 Page style dialog */}
           <motion.div
@@ -202,12 +213,9 @@ export function LandingDialog({
                 transition-all duration-200 ease-out
                 ${isDragOver ? "ring-2 ring-primary ring-offset-2 scale-[1.01]" : ""}
               `}
-              style={{
-                aspectRatio: "1 / 1.2",
-              }}
             >
               <motion.div
-                className="h-full flex flex-col justify-between p-10 sm:p-12"
+                className="flex flex-col gap-8 p-10 sm:p-12"
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.15 }}
               >
@@ -224,7 +232,7 @@ export function LandingDialog({
                 </div>
 
                 {/* CTA section */}
-                <div className="-mt-6 -mb-4">
+                <div>
                   <input
                     ref={fileInputRef}
                     type="file"

@@ -23,7 +23,7 @@ const HIGHLIGHT_COLORS: { color: HighlightColor; bg: string; label: string }[] =
 
 const STRIKETHROUGH_COLORS: { color: StrikethroughColor; bg: string; label: string }[] = [
   { color: "red", bg: "bg-red-500", label: "Red" },
-  { color: "black", bg: "bg-foreground", label: "Black" },
+  { color: "black", bg: "bg-stone-800", label: "Black" },
 ];
 
 interface SelectionToolbarProps {
@@ -97,7 +97,7 @@ export function SelectionToolbar({
         onMouseDown={preventSelectionLoss}
         onClick={preventSelectionLoss}
       >
-        <div className="flex items-center gap-0.5 px-1 py-1 bg-popover rounded-lg shadow-lg border border-border">
+        <div className="flex items-center gap-0.5 px-2 py-1 bg-popover rounded-full shadow-lg border border-border">
           {/* Highlight button with color picker */}
           <div className="relative">
             <Tooltip>
@@ -105,7 +105,7 @@ export function SelectionToolbar({
                 <button
                   type="button"
                   className={cn(
-                    "flex items-center gap-1 px-2 py-1.5 rounded-md transition-colors",
+                    "flex items-center gap-1 px-2 py-1.5 rounded-full transition-colors",
                     "text-muted-foreground hover:text-foreground hover:bg-accent",
                     showHighlightPicker && "bg-accent text-foreground"
                   )}
@@ -126,7 +126,7 @@ export function SelectionToolbar({
             {/* Highlight color picker dropdown */}
             {showHighlightPicker && (
               <div
-                className="absolute top-full left-0 mt-1 p-1.5 bg-popover rounded-lg shadow-lg border border-border flex gap-1"
+                className="absolute top-full left-0 mt-1 p-1.5 bg-popover rounded-full shadow-lg border border-border flex gap-1"
                 onMouseDown={preventSelectionLoss}
                 onClick={preventSelectionLoss}
               >
@@ -161,7 +161,7 @@ export function SelectionToolbar({
                 <button
                   type="button"
                   className={cn(
-                    "flex items-center gap-1 px-2 py-1.5 rounded-md transition-colors",
+                    "flex items-center gap-1 px-2 py-1.5 rounded-full transition-colors",
                     "text-muted-foreground hover:text-destructive hover:bg-destructive/10",
                     showStrikethroughPicker && "bg-destructive/10 text-destructive"
                   )}
@@ -182,7 +182,7 @@ export function SelectionToolbar({
             {/* Strikethrough color picker dropdown */}
             {showStrikethroughPicker && (
               <div
-                className="absolute top-full right-0 mt-1 p-1.5 bg-popover rounded-lg shadow-lg border border-border flex gap-1"
+                className="absolute top-full right-0 mt-1 p-1.5 bg-popover rounded-full shadow-lg border border-border flex gap-1"
                 onMouseDown={preventSelectionLoss}
                 onClick={preventSelectionLoss}
               >
@@ -216,7 +216,7 @@ export function SelectionToolbar({
               <button
                 type="button"
                 className={cn(
-                  "flex items-center gap-1 px-2 py-1.5 rounded-md transition-colors",
+                  "flex items-center gap-1 px-2 py-1.5 rounded-full transition-colors",
                   "text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                 )}
                 onMouseDown={preventSelectionLoss}
