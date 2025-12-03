@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Switch } from "@/components/ui/switch";
 import { SignaturePopover } from "./signature/signature-popover";
+import { MicroAppCombobox, MicroApp } from "@/components/micro-apps";
 
 interface ToolbarProps {
   scale: number;
@@ -45,6 +46,7 @@ interface ToolbarProps {
   onSignaturePopoverChange: (open: boolean) => void;
   onSignatureCreated: (dataUrl: string) => void;
   onDownload: (options: { rasterize: boolean; hasRedactions: boolean }) => void;
+  onMicroAppSelect?: (app: MicroApp) => void;
 }
 
 export function Toolbar({
@@ -64,6 +66,7 @@ export function Toolbar({
   onSignaturePopoverChange,
   onSignatureCreated,
   onDownload,
+  onMicroAppSelect,
 }: ToolbarProps) {
   const [isDownloadOpen, setIsDownloadOpen] = useState(false);
   const [secureDownload, setSecureDownload] = useState(hasRedactions);
@@ -128,6 +131,14 @@ export function Toolbar({
               <p>Add Signature</p>
             </TooltipContent>
           </Tooltip>
+
+          <Divider />
+
+          {/* Micro Apps */}
+          <MicroAppCombobox
+            onSelect={(app) => onMicroAppSelect?.(app)}
+            hasDocument={true}
+          />
 
           <Divider />
 

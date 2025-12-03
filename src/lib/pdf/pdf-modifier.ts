@@ -403,9 +403,9 @@ export async function modifyPDF(
  * the resulting images back into a new PDF. This ensures any text
  * (including redacted text) cannot be extracted from the resulting PDF.
  */
-async function rasterizePDF(pdfBytes: Uint8Array): Promise<Uint8Array> {
+export async function rasterizePDF(pdfBytes: Uint8Array): Promise<Uint8Array> {
   // Configure pdfjs worker (same as react-pdf uses)
-  pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+  pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
   // Load the PDF with pdfjs
   const loadingTask = pdfjs.getDocument({ data: pdfBytes });
@@ -431,7 +431,7 @@ async function rasterizePDF(pdfBytes: Uint8Array): Promise<Uint8Array> {
     const viewport = page.getViewport({ scale });
 
     // Create a canvas to render the page
-    const canvas = document.createElement("canvas");
+    let canvas: HTMLCanvasElement | null = document.createElement("canvas");
     const context = canvas.getContext("2d");
     if (!context) {
       throw new Error("Could not get canvas 2d context");
@@ -452,6 +452,11 @@ async function rasterizePDF(pdfBytes: Uint8Array): Promise<Uint8Array> {
     const base64Data = imageDataUrl.split(",")[1];
     const imageBytes = Uint8Array.from(atob(base64Data), (c) => c.charCodeAt(0));
 
+    // Clean up canvas to free memory
+    canvas.width = 0;
+    canvas.height = 0;
+    canvas = null;
+
     // Embed the image in the new PDF
     const image = await newPdfDoc.embedJpg(imageBytes);
 
@@ -470,6 +475,9 @@ async function rasterizePDF(pdfBytes: Uint8Array): Promise<Uint8Array> {
       width: pageWidth,
       height: pageHeight,
     });
+
+    // Clean up page reference
+    page.cleanup();
   }
 
   return newPdfDoc.save();

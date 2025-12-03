@@ -2,8 +2,9 @@ import type { TabId, EditorSnapshot } from "@/hooks/use-multi-document-state";
 
 // Database configuration
 const DB_NAME = "paperwork-db";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = "sessions";
+const PENDING_PDF_STORE = "pending-pdfs";
 
 // Helper to get localStorage key for a session
 function getSessionMarkerKey(sessionId: string): string {
@@ -46,23 +47,39 @@ function openDatabase(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         db.createObjectStore(STORE_NAME);
       }
+      if (!db.objectStoreNames.contains(PENDING_PDF_STORE)) {
+        db.createObjectStore(PENDING_PDF_STORE);
+      }
     };
   });
 }
 
+// Custom error types for better handling
+export class StorageQuotaError extends Error {
+  constructor(message: string = "Storage quota exceeded") {
+    super(message);
+    this.name = "StorageQuotaError";
+  }
+}
+
 // Save session to IndexedDB
 export async function saveSession(sessionId: string, session: PersistedSession): Promise<void> {
-  try {
-    const db = await openDatabase();
+  const db = await openDatabase();
 
-    return new Promise((resolve, reject) => {
+  try {
+    return await new Promise((resolve, reject) => {
       const transaction = db.transaction(STORE_NAME, "readwrite");
       const store = transaction.objectStore(STORE_NAME);
 
       const request = store.put(session, sessionId);
 
-      request.onerror = () => {
-        reject(new Error("Failed to save session"));
+      request.onerror = (event) => {
+        const error = (event.target as IDBRequest).error;
+        if (error?.name === "QuotaExceededError") {
+          reject(new StorageQuotaError("Storage quota exceeded. Please clear some browser data."));
+        } else {
+          reject(new Error("Failed to save session"));
+        }
       };
 
       request.onsuccess = () => {
@@ -75,23 +92,33 @@ export async function saveSession(sessionId: string, session: PersistedSession):
         resolve();
       };
 
+      transaction.onerror = (event) => {
+        const error = (event.target as IDBTransaction).error;
+        if (error?.name === "QuotaExceededError") {
+          reject(new StorageQuotaError("Storage quota exceeded. Please clear some browser data."));
+        } else {
+          reject(new Error("Transaction failed"));
+        }
+      };
+
       transaction.oncomplete = () => {
-        db.close();
+        // Cleanup handled in finally
       };
     });
-  } catch (error) {
-    console.error("Failed to save session:", error);
-    throw error;
+  } finally {
+    db.close();
   }
 }
 
 // Load session from IndexedDB
 export async function loadSession(sessionId: string): Promise<PersistedSession | null> {
-  try {
-    const db = await openDatabase();
+  let db: IDBDatabase | null = null;
 
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(STORE_NAME, "readonly");
+  try {
+    db = await openDatabase();
+
+    return await new Promise((resolve, reject) => {
+      const transaction = db!.transaction(STORE_NAME, "readonly");
       const store = transaction.objectStore(STORE_NAME);
 
       const request = store.get(sessionId);
@@ -119,15 +146,23 @@ export async function loadSession(sessionId: string): Promise<PersistedSession |
           return;
         }
 
-        // Filter out corrupted tabs
+        // Filter out corrupted tabs (with safe Uint8Array check)
         const validTabs = data.tabs.filter((tab) => {
-          return (
-            typeof tab.id === "string" &&
-            typeof tab.fileName === "string" &&
-            tab.pdfBytes instanceof Uint8Array &&
-            tab.pdfBytes.length > 0 &&
-            tab.editorSnapshot !== undefined
-          );
+          try {
+            // Ensure pdfBytes is a Uint8Array (may need conversion after deserialization)
+            if (tab.pdfBytes && !(tab.pdfBytes instanceof Uint8Array)) {
+              tab.pdfBytes = new Uint8Array(tab.pdfBytes as ArrayLike<number>);
+            }
+            return (
+              typeof tab.id === "string" &&
+              typeof tab.fileName === "string" &&
+              tab.pdfBytes instanceof Uint8Array &&
+              tab.pdfBytes.length > 0 &&
+              tab.editorSnapshot !== undefined
+            );
+          } catch {
+            return false;
+          }
         });
 
         if (validTabs.length === 0) {
@@ -152,8 +187,8 @@ export async function loadSession(sessionId: string): Promise<PersistedSession |
         });
       };
 
-      transaction.oncomplete = () => {
-        db.close();
+      transaction.onerror = () => {
+        reject(new Error("Transaction failed"));
       };
     });
   } catch (error) {
@@ -161,23 +196,27 @@ export async function loadSession(sessionId: string): Promise<PersistedSession |
     // Clear potentially corrupted data
     await clearSession(sessionId);
     return null;
+  } finally {
+    db?.close();
   }
 }
 
 // Clear stored session data for a specific session
 export async function clearSession(sessionId: string): Promise<void> {
+  // Clear localStorage marker
   try {
-    // Clear localStorage marker
-    try {
-      localStorage.removeItem(getSessionMarkerKey(sessionId));
-    } catch {
-      // Ignore localStorage errors
-    }
+    localStorage.removeItem(getSessionMarkerKey(sessionId));
+  } catch {
+    // Ignore localStorage errors
+  }
 
-    const db = await openDatabase();
+  let db: IDBDatabase | null = null;
 
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(STORE_NAME, "readwrite");
+  try {
+    db = await openDatabase();
+
+    await new Promise<void>((resolve, reject) => {
+      const transaction = db!.transaction(STORE_NAME, "readwrite");
       const store = transaction.objectStore(STORE_NAME);
 
       const request = store.delete(sessionId);
@@ -190,13 +229,15 @@ export async function clearSession(sessionId: string): Promise<void> {
         resolve();
       };
 
-      transaction.oncomplete = () => {
-        db.close();
+      transaction.onerror = () => {
+        reject(new Error("Transaction failed"));
       };
     });
   } catch (error) {
     console.error("Failed to clear session:", error);
     // Don't throw - clearing should be best-effort
+  } finally {
+    db?.close();
   }
 }
 
@@ -222,5 +263,135 @@ export function isStorageAvailable(): boolean {
     return true;
   } catch {
     return false;
+  }
+}
+
+// Pending PDF storage (for transferring between pages without sessionStorage limits)
+export interface PendingPdf {
+  sessionId: string;
+  name: string;
+  bytes: Uint8Array;
+}
+
+// Save pending PDF to IndexedDB (for cross-page navigation)
+export async function savePendingPdf(pdf: PendingPdf): Promise<void> {
+  const db = await openDatabase();
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction(PENDING_PDF_STORE, "readwrite");
+      const store = transaction.objectStore(PENDING_PDF_STORE);
+
+      const request = store.put(pdf, "pending");
+
+      request.onerror = (event) => {
+        const error = (event.target as IDBRequest).error;
+        if (error?.name === "QuotaExceededError") {
+          reject(new StorageQuotaError("Storage quota exceeded. Please clear some browser data."));
+        } else {
+          reject(new Error("Failed to save pending PDF"));
+        }
+      };
+
+      request.onsuccess = () => {
+        resolve();
+      };
+
+      transaction.onerror = (event) => {
+        const error = (event.target as IDBTransaction).error;
+        if (error?.name === "QuotaExceededError") {
+          reject(new StorageQuotaError("Storage quota exceeded. Please clear some browser data."));
+        } else {
+          reject(new Error("Transaction failed"));
+        }
+      };
+    });
+  } finally {
+    db.close();
+  }
+}
+
+// Load and remove pending PDF from IndexedDB
+export async function loadPendingPdf(): Promise<PendingPdf | null> {
+  let db: IDBDatabase | null = null;
+
+  try {
+    db = await openDatabase();
+
+    return await new Promise((resolve, reject) => {
+      const transaction = db!.transaction(PENDING_PDF_STORE, "readwrite");
+      const store = transaction.objectStore(PENDING_PDF_STORE);
+
+      const getRequest = store.get("pending");
+
+      getRequest.onerror = () => {
+        reject(new Error("Failed to load pending PDF"));
+      };
+
+      getRequest.onsuccess = () => {
+        const data = getRequest.result as PendingPdf | undefined;
+
+        if (data) {
+          // Delete after reading
+          store.delete("pending");
+        }
+
+        // Ensure bytes is a Uint8Array (safe conversion)
+        if (data) {
+          try {
+            if (!(data.bytes instanceof Uint8Array)) {
+              data.bytes = new Uint8Array(data.bytes as ArrayLike<number>);
+            }
+          } catch {
+            // If conversion fails, return null
+            resolve(null);
+            return;
+          }
+        }
+
+        resolve(data || null);
+      };
+
+      transaction.onerror = () => {
+        reject(new Error("Transaction failed"));
+      };
+    });
+  } catch (error) {
+    console.error("Failed to load pending PDF:", error);
+    return null;
+  } finally {
+    db?.close();
+  }
+}
+
+// Clear pending PDF (cleanup if navigation fails)
+export async function clearPendingPdf(): Promise<void> {
+  let db: IDBDatabase | null = null;
+
+  try {
+    db = await openDatabase();
+
+    await new Promise<void>((resolve, reject) => {
+      const transaction = db!.transaction(PENDING_PDF_STORE, "readwrite");
+      const store = transaction.objectStore(PENDING_PDF_STORE);
+
+      const request = store.delete("pending");
+
+      request.onerror = () => {
+        reject(new Error("Failed to clear pending PDF"));
+      };
+
+      request.onsuccess = () => {
+        resolve();
+      };
+
+      transaction.onerror = () => {
+        reject(new Error("Transaction failed"));
+      };
+    });
+  } catch (error) {
+    console.error("Failed to clear pending PDF:", error);
+  } finally {
+    db?.close();
   }
 }

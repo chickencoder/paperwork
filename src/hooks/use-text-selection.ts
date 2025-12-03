@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, type RefObject } from "react";
+import { useState, useEffect, useCallback, useRef, type RefObject } from "react";
 import type { AnnotationRect } from "@/lib/pdf/types";
 
 export interface TextSelection {
@@ -79,6 +79,7 @@ export function useTextSelection({
   enabled = true,
 }: UseTextSelectionOptions) {
   const [selection, setSelection] = useState<TextSelection | null>(null);
+  const mouseUpTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearSelection = useCallback(() => {
     setSelection(null);
@@ -174,14 +175,22 @@ export function useTextSelection({
 
     // Also check on mouseup for more reliable detection
     const handleMouseUp = () => {
+      // Clear any pending timeout
+      if (mouseUpTimeoutRef.current) {
+        clearTimeout(mouseUpTimeoutRef.current);
+      }
       // Small delay to let selection finalize
-      setTimeout(handleSelectionChange, 10);
+      mouseUpTimeoutRef.current = setTimeout(handleSelectionChange, 10);
     };
     document.addEventListener("mouseup", handleMouseUp);
 
     return () => {
       document.removeEventListener("selectionchange", handleSelectionChange);
       document.removeEventListener("mouseup", handleMouseUp);
+      // Cleanup timeout on unmount
+      if (mouseUpTimeoutRef.current) {
+        clearTimeout(mouseUpTimeoutRef.current);
+      }
     };
   }, [containerRef, scale, enabled]);
 

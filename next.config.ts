@@ -1,21 +1,30 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Webpack configuration for react-pdf and pdf.js
-  webpack: (config) => {
-    // Disable canvas and encoding which aren't needed for PDF rendering in browser
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      canvas: false,
-      encoding: false,
-    };
-    return config;
-  },
-
-  // Enable experimental features for better performance
-  experimental: {
-    // Optimize package imports
-    optimizePackageImports: ["lucide-react", "framer-motion"],
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          {
+            key: "X-Content-Type-Options",
+            value: "nosniff",
+          },
+          {
+            key: "X-Frame-Options",
+            value: "DENY",
+          },
+          {
+            key: "X-XSS-Protection",
+            value: "1; mode=block",
+          },
+          {
+            key: "Referrer-Policy",
+            value: "strict-origin-when-cross-origin",
+          },
+        ],
+      },
+    ];
   },
 };
 

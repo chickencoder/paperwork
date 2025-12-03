@@ -22,7 +22,12 @@ import { PageSkeleton } from "./page-skeleton";
 import { useVirtualizedPages } from "@/hooks/use-virtualized-pages";
 
 // Configure PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+
+// PDF.js options for JPEG 2000 support (OpenJPEG WASM decoder)
+const pdfOptions = {
+  wasmUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/wasm/`,
+};
 
 // Default US Letter page size (612x792 points at 72 DPI)
 const DEFAULT_PAGE_WIDTH = 612;
@@ -393,6 +398,7 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
         <Document
           file={file}
           onLoadSuccess={onDocumentLoadSuccess}
+          options={pdfOptions}
           className="flex flex-col items-center gap-6"
           loading={<div className="h-96" />}
         >

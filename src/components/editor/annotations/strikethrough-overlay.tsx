@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { StrikethroughAnnotation, StrikethroughColor } from "@/lib/pdf/types";
@@ -40,6 +40,15 @@ export function StrikethroughOverlay({
   );
 
   const centerX = (bounds.minX + bounds.maxX) / 2;
+
+  // Cleanup timeout on unmount to prevent memory leak
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleMouseEnter = () => {
     if (hoverTimeoutRef.current) {

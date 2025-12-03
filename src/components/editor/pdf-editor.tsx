@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useCallback, useRef, useState } from "react";
+import { useQueryState, parseAsString } from "nuqs";
 import { motion } from "framer-motion";
 import { useEditorState, type EditorSnapshot } from "@/hooks/use-editor-state";
 import { useTextSelection } from "@/hooks/use-text-selection";
@@ -13,6 +14,21 @@ import { PDFViewer, type PDFViewerHandle } from "./pdf-viewer";
 import { Toolbar } from "./toolbar";
 import { SelectionToolbar } from "./selection-toolbar";
 import { ScrollProgress } from "./scroll-progress";
+import { CompressPdfWindow } from "@/components/micro-apps/windows/compress-pdf-window";
+import { UnlockPdfWindow } from "@/components/micro-apps/windows/unlock-pdf-window";
+import { FlattenPdfWindow } from "@/components/micro-apps/windows/flatten-pdf-window";
+import { SplitPdfWindow } from "@/components/micro-apps/windows/split-pdf-window";
+import { RotatePdfWindow } from "@/components/micro-apps/windows/rotate-pdf-window";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
+import type { MicroApp } from "@/components/micro-apps";
 import type { TransitionState } from "@/components/landing/landing-dialog";
 
 interface PDFEditorProps {
@@ -21,6 +37,7 @@ interface PDFEditorProps {
   initialFormValues?: Record<string, string | boolean>;
   onStateChange?: (snapshot: EditorSnapshot, isDirty: boolean) => void;
   onFormValuesChange?: (values: Record<string, string | boolean>) => void;
+  onAddTab?: (file: File, bytes: Uint8Array) => void;
   hasTabBar?: boolean;
   isEntering?: boolean;
   entryRect?: TransitionState["dialogRect"];
@@ -33,6 +50,7 @@ export function PDFEditor({
   initialFormValues,
   onStateChange,
   onFormValuesChange,
+  onAddTab,
   hasTabBar = false,
   isEntering = false,
   entryRect,
@@ -72,8 +90,11 @@ export function PDFEditor({
   const viewerContainerRef = useRef<HTMLDivElement | null>(null);
   const [isSignaturePopoverOpen, setIsSignaturePopoverOpen] = useState(false);
   const [pendingSignatureData, setPendingSignatureData] = useState<string | null>(null);
+  const [activeMicroApp, setActiveMicroApp] = useQueryState("tool", parseAsString);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   const mousePositionRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const clearSelectionRef = useRef<(() => void) | null>(null);
+  const loadVersionRef = useRef(0);
 
   // Dismiss all popovers and selections when zooming starts
   const handleZoomStart = useCallback(() => {
@@ -125,9 +146,17 @@ export function PDFEditor({
 
   // Load the PDF bytes when file changes
   useEffect(() => {
+    // Increment version to track current load
+    loadVersionRef.current += 1;
+    const currentVersion = loadVersionRef.current;
+
     async function load() {
       try {
         const arrayBuffer = await file.arrayBuffer();
+        // Check if this load is still the latest
+        if (currentVersion !== loadVersionRef.current) {
+          return; // Stale load, skip
+        }
         const bytes = new Uint8Array(arrayBuffer);
         setPdf(file, bytes);
       } catch (error) {
@@ -438,6 +467,11 @@ export function PDFEditor({
   const handleDownload = useCallback(async (options: { rasterize: boolean; hasRedactions: boolean }) => {
     if (!state.pdfBytes) return;
 
+    // Clear any previous error
+    setDownloadError(null);
+
+    let url: string | null = null;
+
     try {
       // Extract form values from the DOM
       const container = viewerRef.current?.getContainer();
@@ -463,21 +497,31 @@ export function PDFEditor({
       }
 
       const blob = new Blob([new Uint8Array(modifiedBytes)], { type: "application/pdf" });
-      const url = URL.createObjectURL(blob);
+      url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = file.name.replace(".pdf", suffix);
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Failed to download PDF:", error);
+      setDownloadError("Failed to download PDF. Please try again.");
+    } finally {
+      // Always clean up the Object URL
+      if (url) {
+        URL.revokeObjectURL(url);
+      }
     }
   }, [state.pdfBytes, state.textAnnotations, state.signatureAnnotations, state.highlightAnnotations, state.strikethroughAnnotations, state.redactionAnnotations, file.name]);
 
   // Check if there are any enabled redactions
   const hasRedactions = state.redactionAnnotations.some(r => r.enabled);
+
+  // Handle micro-app selection from toolbar
+  const handleMicroAppSelect = useCallback((app: MicroApp) => {
+    setActiveMicroApp(app.id);
+  }, []);
 
   if (!state.pdfFile) {
     return <div className="min-h-screen bg-muted" />;
@@ -509,6 +553,7 @@ export function PDFEditor({
         onSignaturePopoverChange={setIsSignaturePopoverOpen}
         onSignatureCreated={handleSignatureCreated}
         onDownload={handleDownload}
+        onMicroAppSelect={handleMicroAppSelect}
       />
 
       <motion.div
@@ -533,7 +578,7 @@ export function PDFEditor({
       >
         <PDFViewer
           ref={viewerRef}
-          file={file}
+          file={state.pdfFile || file}
           scale={baseScale}
           cssScale={cssScale}
           textAnnotations={state.textAnnotations}
@@ -571,6 +616,57 @@ export function PDFEditor({
           onRedact={handleRedact}
         />
       )}
+
+      {/* Micro-app windows */}
+      <CompressPdfWindow
+        open={activeMicroApp === "compress-pdf"}
+        onClose={() => setActiveMicroApp(null)}
+        pdfBytes={state.pdfBytes}
+        fileName={file.name}
+      />
+      <UnlockPdfWindow
+        open={activeMicroApp === "unlock-pdf"}
+        onClose={() => setActiveMicroApp(null)}
+        pdfBytes={state.pdfBytes}
+        fileName={file.name}
+      />
+      <FlattenPdfWindow
+        open={activeMicroApp === "flatten-pdf"}
+        onClose={() => setActiveMicroApp(null)}
+        pdfBytes={state.pdfBytes}
+        fileName={file.name}
+      />
+      <SplitPdfWindow
+        open={activeMicroApp === "split-pdf"}
+        onClose={() => setActiveMicroApp(null)}
+        pdfBytes={state.pdfBytes}
+        fileName={file.name}
+        onAddTab={onAddTab}
+      />
+      <RotatePdfWindow
+        open={activeMicroApp === "rotate-pdf"}
+        onClose={() => setActiveMicroApp(null)}
+        pdfBytes={state.pdfBytes}
+        fileName={file.name}
+        onApply={(newBytes) => {
+          // Create a new File object with the rotated bytes
+          const newFile = new File([new Uint8Array(newBytes)], file.name, { type: "application/pdf" });
+          setPdf(newFile, newBytes);
+        }}
+      />
+
+      {/* Download error dialog */}
+      <AlertDialog open={!!downloadError} onOpenChange={(open) => !open && setDownloadError(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Download Failed</AlertDialogTitle>
+            <AlertDialogDescription>{downloadError}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setDownloadError(null)}>OK</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

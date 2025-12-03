@@ -8,19 +8,47 @@ export interface LoadedPDF {
   formFields: FormField[];
 }
 
-export async function loadPDF(file: File): Promise<LoadedPDF> {
+// Custom error for encrypted PDFs
+export class EncryptedPDFError extends Error {
+  constructor(message: string = "This PDF is password-protected and cannot be opened") {
+    super(message);
+    this.name = "EncryptedPDFError";
+  }
+}
+
+export interface LoadPDFOptions {
+  ignoreEncryption?: boolean;
+}
+
+export async function loadPDF(file: File, options: LoadPDFOptions = {}): Promise<LoadedPDF> {
   const arrayBuffer = await file.arrayBuffer();
   const bytes = new Uint8Array(arrayBuffer);
-  const document = await PDFDocument.load(bytes, { ignoreEncryption: true });
-  const pageCount = document.getPageCount();
-  const formFields = extractFormFields(document);
 
-  return {
-    document,
-    bytes,
-    pageCount,
-    formFields,
-  };
+  try {
+    // Try to load the PDF - will throw if encrypted
+    const document = await PDFDocument.load(bytes, {
+      ignoreEncryption: options.ignoreEncryption ?? false,
+    });
+
+    const pageCount = document.getPageCount();
+    const formFields = extractFormFields(document);
+
+    return {
+      document,
+      bytes,
+      pageCount,
+      formFields,
+    };
+  } catch (error) {
+    // Check if this is an encryption error
+    if (error instanceof Error) {
+      const message = error.message.toLowerCase();
+      if (message.includes("encrypted") || message.includes("password")) {
+        throw new EncryptedPDFError();
+      }
+    }
+    throw error;
+  }
 }
 
 function extractFormFields(document: PDFDocument): FormField[] {
@@ -91,6 +119,21 @@ function extractFormFields(document: PDFDocument): FormField[] {
   return formFields;
 }
 
-export async function loadPDFFromBytes(bytes: Uint8Array): Promise<PDFDocument> {
-  return PDFDocument.load(bytes, { ignoreEncryption: true });
+export async function loadPDFFromBytes(
+  bytes: Uint8Array,
+  options: LoadPDFOptions = {}
+): Promise<PDFDocument> {
+  try {
+    return await PDFDocument.load(bytes, {
+      ignoreEncryption: options.ignoreEncryption ?? false,
+    });
+  } catch (error) {
+    if (error instanceof Error) {
+      const message = error.message.toLowerCase();
+      if (message.includes("encrypted") || message.includes("password")) {
+        throw new EncryptedPDFError();
+      }
+    }
+    throw error;
+  }
 }

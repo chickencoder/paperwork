@@ -8,29 +8,22 @@ export default function LandingPage() {
   const [isTransitioning, setIsTransitioning] = useState(false);
 
   return (
-    <main className="relative min-h-screen bg-background">
-      {/* Grid background - fades out during transition */}
+    <main className="relative min-h-screen">
+      {/* Background image */}
       <motion.div
-        className="absolute inset-0 bg-grid-pattern"
-        initial={{ opacity: 0.4 }}
-        animate={{ opacity: isTransitioning ? 0 : 0.4 }}
-        transition={{ duration: 0.3 }}
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "url('/lark.png')" }}
+        initial={{ opacity: 1 }}
+        animate={{ opacity: isTransitioning ? 0 : 1 }}
+        transition={{ duration: 0.2 }}
       />
 
-      {/* Noise texture overlay for paper feel */}
+      {/* Dark overlay for better contrast */}
       <motion.div
-        className="absolute inset-0 bg-noise pointer-events-none"
-        initial={{ opacity: 0.03 }}
-        animate={{ opacity: isTransitioning ? 0 : 0.03 }}
-        transition={{ duration: 0.3 }}
-      />
-
-      {/* Background transitions to muted during exit */}
-      <motion.div
-        className="absolute inset-0 bg-muted"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: isTransitioning ? 1 : 0 }}
-        transition={{ duration: 0.3 }}
+        className="absolute inset-0 bg-black/30"
+        initial={{ opacity: 1 }}
+        animate={{ opacity: isTransitioning ? 0 : 1 }}
+        transition={{ duration: 0.2 }}
       />
 
       {/* Landing dialog overlay */}

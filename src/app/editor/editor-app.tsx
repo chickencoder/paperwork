@@ -18,6 +18,7 @@ import {
   hasPersistedSession,
   loadSession,
   clearSession,
+  loadPendingPdf,
   type PersistedSession,
 } from "@/lib/storage/persistence";
 import { mergePDFs } from "@/lib/pdf/pdf-merger";
@@ -83,9 +84,13 @@ function EditorContent({
   // Track drag enter/leave count to handle nested elements
   const dragCounterRef = useRef(0);
 
+  // Track if we've already handled the pending PDF (prevents double-add in StrictMode)
+  const pendingPdfHandledRef = useRef(false);
+
   // Handle pending PDF from landing page
   useEffect(() => {
-    if (pendingPdf && pendingPdf.bytes.length > 0) {
+    if (pendingPdf && pendingPdf.bytes.length > 0 && !pendingPdfHandledRef.current) {
+      pendingPdfHandledRef.current = true;
       const file = new File([pendingPdf.bytes as BlobPart], pendingPdf.name, {
         type: "application/pdf",
       });
@@ -301,6 +306,7 @@ function EditorContent({
           initialFormValues={initialFormValues?.get(activeTab.id)}
           onStateChange={handleEditorStateChange}
           onFormValuesChange={handleFormValuesChange}
+          onAddTab={addTab}
           hasTabBar={orderedTabs.length > 1}
           isEntering={isEntering}
           entryRect={entryRect}
@@ -366,22 +372,19 @@ export default function EditorApp({ sessionId }: { sessionId: string }) {
   // Check for pending PDF and persisted session on mount
   useEffect(() => {
     async function initialize() {
-      // First, check for pending PDF from landing page
+      // First, check for pending PDF from landing page (stored in IndexedDB)
       let hasPendingPdf = false;
-      const pending = sessionStorage.getItem("pendingPdf");
-      if (pending) {
-        try {
-          const { name, bytes } = JSON.parse(pending);
+      try {
+        const pending = await loadPendingPdf();
+        if (pending) {
           setPendingPdf({
-            name,
-            bytes: new Uint8Array(bytes),
+            name: pending.name,
+            bytes: pending.bytes,
           });
-          sessionStorage.removeItem("pendingPdf");
           hasPendingPdf = true;
-        } catch (e) {
-          console.error("Failed to parse pending PDF:", e);
-          sessionStorage.removeItem("pendingPdf");
         }
+      } catch (e) {
+        console.error("Failed to load pending PDF:", e);
       }
 
       // Check for transition state from homepage
@@ -439,7 +442,10 @@ export default function EditorApp({ sessionId }: { sessionId: string }) {
         setAppState({ status: "ready" });
       }
     }
-    initialize();
+    initialize().catch((error) => {
+      console.error("Failed to initialize editor:", error);
+      setAppState({ status: "ready" });
+    });
   }, [sessionId]);
 
   // Handle restore confirmation

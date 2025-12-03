@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { NuqsAdapter } from "nuqs/adapters/next/app";
+import { ConvexClientProvider } from "@/components/convex-client-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -87,7 +89,11 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        <ConvexClientProvider>
+          <NuqsAdapter>{children}</NuqsAdapter>
+        </ConvexClientProvider>
+      </body>
     </html>
   );
 }
