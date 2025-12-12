@@ -41,8 +41,14 @@ export function HomepageNavbar() {
           </span>
         </Link>
 
-        <div className="flex items-center gap-4">
-          <div className="hidden sm:block">
+        <div className="flex items-center gap-2">
+          <div className="hidden sm:flex items-center gap-1">
+            <Link
+              href="/blog"
+              className="flex items-center px-3 py-2 rounded-full text-sm font-medium transition-colors duration-150 text-muted-foreground hover:text-foreground hover:bg-muted/50"
+            >
+              Blog
+            </Link>
             <ToolsNavigation />
           </div>
           <Button asChild size="sm">

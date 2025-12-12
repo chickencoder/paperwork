@@ -5,7 +5,10 @@ import remarkGfm from "remark-gfm";
 import rehypeSlug from "rehype-slug";
 import rehypeAutolinkHeadings from "rehype-autolink-headings";
 import { getAllArticles, getArticleBySlug } from "@/lib/blog/mdx";
-import { ArticleHeader } from "@/components/blog/article-header";
+import {
+  ArticleHeader,
+  ArticleHeroImage,
+} from "@/components/blog/article-header";
 import { ArticleSidebar } from "@/components/blog/article-sidebar";
 import { mdxComponents } from "@/components/blog/mdx-components";
 
@@ -69,26 +72,31 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   }
 
   return (
-    <article className="pt-24">
-      <ArticleHeader {...article} />
+    <article className="pt-24 sm:pt-32 pb-16 sm:pb-24 px-6 lg:px-12">
+      <div className="max-w-7xl mx-auto">
+        {/* Hero Image */}
+        <ArticleHeroImage heroImage={article.heroImage} />
 
-      <div className="max-w-7xl mx-auto px-6 lg:px-12 py-12">
         <div className="grid lg:grid-cols-[1fr_280px] gap-12">
           {/* Main content */}
           <div className="min-w-0">
-            <MDXRemote
-              source={article.content}
-              components={mdxComponents}
-              options={{
-                mdxOptions: {
-                  remarkPlugins: [remarkGfm],
-                  rehypePlugins: [
-                    rehypeSlug,
-                    [rehypeAutolinkHeadings, { behavior: "wrap" }],
-                  ],
-                },
-              }}
-            />
+            <ArticleHeader {...article} />
+
+            <div className="prose prose-lg dark:prose-invert max-w-none">
+              <MDXRemote
+                source={article.content}
+                components={mdxComponents}
+                options={{
+                  mdxOptions: {
+                    remarkPlugins: [remarkGfm],
+                    rehypePlugins: [
+                      rehypeSlug,
+                      [rehypeAutolinkHeadings, { behavior: "wrap" }],
+                    ],
+                  },
+                }}
+              />
+            </div>
           </div>
 
           {/* Sidebar */}

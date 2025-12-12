@@ -45,8 +45,8 @@ function BlogContent() {
     : articles;
 
   return (
-    <div className="pt-24 sm:pt-32 pb-16 sm:pb-24">
-      <div className="max-w-7xl mx-auto px-6 lg:px-12">
+    <div className="pt-24 sm:pt-32 pb-16 sm:pb-24 px-6 lg:px-12">
+      <div className="max-w-7xl mx-auto">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -126,8 +126,8 @@ function BlogContent() {
 
 function BlogPageFallback() {
   return (
-    <div className="pt-24 sm:pt-32 pb-16 sm:pb-24">
-      <div className="max-w-7xl mx-auto px-6 lg:px-12">
+    <div className="pt-24 sm:pt-32 pb-16 sm:pb-24 px-6 lg:px-12">
+      <div className="max-w-7xl mx-auto">
         <div className="mb-12">
           <div className="h-12 bg-muted rounded w-32 mb-4 animate-pulse" />
           <div className="h-6 bg-muted rounded w-96 animate-pulse" />
