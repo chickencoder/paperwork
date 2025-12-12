@@ -5,6 +5,8 @@ import type {
   HighlightAnnotation,
   StrikethroughAnnotation,
   RedactionAnnotation,
+  ShapeAnnotation,
+  ShapeType,
 } from "@/lib/pdf/types";
 
 // History configuration
@@ -16,7 +18,8 @@ type ClipboardAnnotation =
   | { type: "signature"; data: Omit<SignatureAnnotation, "id"> }
   | { type: "highlight"; data: Omit<HighlightAnnotation, "id"> }
   | { type: "strikethrough"; data: Omit<StrikethroughAnnotation, "id"> }
-  | { type: "redaction"; data: Omit<RedactionAnnotation, "id"> };
+  | { type: "redaction"; data: Omit<RedactionAnnotation, "id"> }
+  | { type: "shape"; data: Omit<ShapeAnnotation, "id"> };
 
 interface EditorState {
   pdfFile: File | null;
@@ -27,8 +30,10 @@ interface EditorState {
   highlightAnnotations: HighlightAnnotation[];
   strikethroughAnnotations: StrikethroughAnnotation[];
   redactionAnnotations: RedactionAnnotation[];
+  shapeAnnotations: ShapeAnnotation[];
   selectedAnnotationId: string | null;
-  activeTool: "select" | "text-insert" | "signature";
+  activeTool: "select" | "text-insert" | "signature" | "shape";
+  activeShapeType: ShapeType;
   clipboard: ClipboardAnnotation | null;
 }
 
@@ -47,8 +52,12 @@ type EditorAction =
   | { type: "ADD_REDACTION"; annotation: RedactionAnnotation }
   | { type: "REMOVE_REDACTION"; id: string }
   | { type: "TOGGLE_REDACTION"; id: string }
+  | { type: "ADD_SHAPE_ANNOTATION"; annotation: ShapeAnnotation }
+  | { type: "UPDATE_SHAPE_ANNOTATION"; id: string; updates: Partial<Omit<ShapeAnnotation, "id" | "page">> }
+  | { type: "REMOVE_SHAPE_ANNOTATION"; id: string }
   | { type: "SET_SCALE"; scale: number }
-  | { type: "SET_ACTIVE_TOOL"; tool: "select" | "text-insert" | "signature" }
+  | { type: "SET_ACTIVE_TOOL"; tool: "select" | "text-insert" | "signature" | "shape" }
+  | { type: "SET_ACTIVE_SHAPE_TYPE"; shapeType: ShapeType }
   | { type: "SELECT_ANNOTATION"; id: string | null }
   | { type: "COPY_TO_CLIPBOARD"; annotation: ClipboardAnnotation }
   | { type: "RESET" }
@@ -71,6 +80,9 @@ type UndoableAction = Extract<
   | { type: "ADD_REDACTION" }
   | { type: "REMOVE_REDACTION" }
   | { type: "TOGGLE_REDACTION" }
+  | { type: "ADD_SHAPE_ANNOTATION" }
+  | { type: "UPDATE_SHAPE_ANNOTATION" }
+  | { type: "REMOVE_SHAPE_ANNOTATION" }
   | { type: "SET_FORM_FIELD" }
 >;
 
@@ -88,6 +100,9 @@ const UNDOABLE_ACTION_TYPES = [
   "ADD_REDACTION",
   "REMOVE_REDACTION",
   "TOGGLE_REDACTION",
+  "ADD_SHAPE_ANNOTATION",
+  "UPDATE_SHAPE_ANNOTATION",
+  "REMOVE_SHAPE_ANNOTATION",
   "SET_FORM_FIELD",
 ] as const;
 
@@ -114,8 +129,10 @@ export interface EditorSnapshot {
   highlightAnnotations: HighlightAnnotation[];
   strikethroughAnnotations: StrikethroughAnnotation[];
   redactionAnnotations: RedactionAnnotation[];
+  shapeAnnotations: ShapeAnnotation[];
   selectedAnnotationId: string | null;
-  activeTool: "select" | "text-insert" | "signature";
+  activeTool: "select" | "text-insert" | "signature" | "shape";
+  activeShapeType: ShapeType;
   clipboard: ClipboardAnnotation | null;
   historyLength: number;
 }
@@ -136,8 +153,10 @@ const initialState: EditorState = {
   highlightAnnotations: [],
   strikethroughAnnotations: [],
   redactionAnnotations: [],
+  shapeAnnotations: [],
   selectedAnnotationId: null,
   activeTool: "select",
+  activeShapeType: "rectangle",
   clipboard: null,
 };
 
@@ -157,6 +176,7 @@ function getActionAnnotationId(action: UndoableAction): string | null {
   switch (action.type) {
     case "UPDATE_TEXT_ANNOTATION":
     case "UPDATE_SIGNATURE_ANNOTATION":
+    case "UPDATE_SHAPE_ANNOTATION":
       return action.id;
     case "SET_FORM_FIELD":
       return action.fieldId;
@@ -187,6 +207,9 @@ function computeInverseAction(
     case "ADD_REDACTION":
       return { type: "REMOVE_REDACTION", id: action.annotation.id };
 
+    case "ADD_SHAPE_ANNOTATION":
+      return { type: "REMOVE_SHAPE_ANNOTATION", id: action.annotation.id };
+
     // REMOVE actions -> inverse is ADD (capture the removed item)
     case "REMOVE_TEXT_ANNOTATION": {
       const annotation = state.textAnnotations.find((a) => a.id === action.id);
@@ -213,6 +236,11 @@ function computeInverseAction(
       return annotation ? { type: "ADD_REDACTION", annotation } : null;
     }
 
+    case "REMOVE_SHAPE_ANNOTATION": {
+      const annotation = state.shapeAnnotations.find((a) => a.id === action.id);
+      return annotation ? { type: "ADD_SHAPE_ANNOTATION", annotation } : null;
+    }
+
     // UPDATE actions -> inverse is UPDATE with previous values
     case "UPDATE_TEXT_ANNOTATION": {
       const annotation = state.textAnnotations.find((a) => a.id === action.id);
@@ -232,6 +260,16 @@ function computeInverseAction(
         (previousValues as Record<string, unknown>)[key] = annotation[key];
       }
       return { type: "UPDATE_SIGNATURE_ANNOTATION", id: action.id, updates: previousValues };
+    }
+
+    case "UPDATE_SHAPE_ANNOTATION": {
+      const annotation = state.shapeAnnotations.find((a) => a.id === action.id);
+      if (!annotation) return null;
+      const previousValues: Partial<Omit<ShapeAnnotation, "id" | "page">> = {};
+      for (const key of Object.keys(action.updates) as (keyof typeof action.updates)[]) {
+        (previousValues as Record<string, unknown>)[key] = annotation[key];
+      }
+      return { type: "UPDATE_SHAPE_ANNOTATION", id: action.id, updates: previousValues };
     }
 
     // TOGGLE actions -> inverse is the same toggle (self-inverse)
@@ -346,6 +384,26 @@ function editorReducer(state: EditorState, action: EditorAction): EditorState {
         ),
       };
 
+    case "ADD_SHAPE_ANNOTATION":
+      return {
+        ...state,
+        shapeAnnotations: [...state.shapeAnnotations, action.annotation],
+      };
+
+    case "UPDATE_SHAPE_ANNOTATION":
+      return {
+        ...state,
+        shapeAnnotations: state.shapeAnnotations.map((a) =>
+          a.id === action.id ? { ...a, ...action.updates } : a
+        ),
+      };
+
+    case "REMOVE_SHAPE_ANNOTATION":
+      return {
+        ...state,
+        shapeAnnotations: state.shapeAnnotations.filter((a) => a.id !== action.id),
+      };
+
     case "SET_SCALE":
       return {
         ...state,
@@ -357,6 +415,12 @@ function editorReducer(state: EditorState, action: EditorAction): EditorState {
         ...state,
         activeTool: action.tool,
         selectedAnnotationId: null,
+      };
+
+    case "SET_ACTIVE_SHAPE_TYPE":
+      return {
+        ...state,
+        activeShapeType: action.shapeType,
       };
 
     case "SELECT_ANNOTATION":
@@ -462,8 +526,10 @@ function editorReducerWithHistory(
           highlightAnnotations: snapshot.highlightAnnotations,
           strikethroughAnnotations: snapshot.strikethroughAnnotations,
           redactionAnnotations: snapshot.redactionAnnotations,
+          shapeAnnotations: snapshot.shapeAnnotations,
           selectedAnnotationId: snapshot.selectedAnnotationId,
           activeTool: snapshot.activeTool,
+          activeShapeType: snapshot.activeShapeType,
           clipboard: snapshot.clipboard,
         },
         // Restore history length indicator (actual history entries are lost on tab switch)
@@ -488,6 +554,7 @@ function editorReducerWithHistory(
             state.past.length > 0 &&
             (action.type === "UPDATE_TEXT_ANNOTATION" ||
               action.type === "UPDATE_SIGNATURE_ANNOTATION" ||
+              action.type === "UPDATE_SHAPE_ANNOTATION" ||
               action.type === "SET_FORM_FIELD")
           ) {
             const lastEntry = state.past[state.past.length - 1];
@@ -601,8 +668,12 @@ export function useEditorState() {
     dispatch({ type: "SET_SCALE", scale });
   }, []);
 
-  const setActiveTool = useCallback((tool: "select" | "text-insert" | "signature") => {
+  const setActiveTool = useCallback((tool: "select" | "text-insert" | "signature" | "shape") => {
     dispatch({ type: "SET_ACTIVE_TOOL", tool });
+  }, []);
+
+  const setActiveShapeType = useCallback((shapeType: ShapeType) => {
+    dispatch({ type: "SET_ACTIVE_SHAPE_TYPE", shapeType });
   }, []);
 
   const addSignatureAnnotation = useCallback((annotation: SignatureAnnotation) => {
@@ -646,6 +717,21 @@ export function useEditorState() {
 
   const toggleRedaction = useCallback((id: string) => {
     dispatch({ type: "TOGGLE_REDACTION", id });
+  }, []);
+
+  const addShapeAnnotation = useCallback((annotation: ShapeAnnotation) => {
+    dispatch({ type: "ADD_SHAPE_ANNOTATION", annotation });
+  }, []);
+
+  const updateShapeAnnotation = useCallback(
+    (id: string, updates: Partial<Omit<ShapeAnnotation, "id" | "page">>) => {
+      dispatch({ type: "UPDATE_SHAPE_ANNOTATION", id, updates });
+    },
+    []
+  );
+
+  const removeShapeAnnotation = useCallback((id: string) => {
+    dispatch({ type: "REMOVE_SHAPE_ANNOTATION", id });
   }, []);
 
   // Track form field changes for undo/redo (values stored in DOM)
@@ -705,7 +791,14 @@ export function useEditorState() {
       dispatch({ type: "COPY_TO_CLIPBOARD", annotation: { type: "redaction", data } });
       return;
     }
-  }, [state.selectedAnnotationId, state.textAnnotations, state.signatureAnnotations, state.highlightAnnotations, state.strikethroughAnnotations, state.redactionAnnotations]);
+
+    const shapeAnnotation = state.shapeAnnotations.find((a) => a.id === id);
+    if (shapeAnnotation) {
+      const { id: _, ...data } = shapeAnnotation;
+      dispatch({ type: "COPY_TO_CLIPBOARD", annotation: { type: "shape", data } });
+      return;
+    }
+  }, [state.selectedAnnotationId, state.textAnnotations, state.signatureAnnotations, state.highlightAnnotations, state.strikethroughAnnotations, state.redactionAnnotations, state.shapeAnnotations]);
 
   // Paste annotation from clipboard at the specified position
   const pasteAnnotation = useCallback(
@@ -838,6 +931,22 @@ export function useEditorState() {
           dispatch({ type: "SELECT_ANNOTATION", id: newId });
           break;
         }
+        case "shape": {
+          const data = state.clipboard.data;
+          // Center the shape on the paste position
+          const annotation: ShapeAnnotation = {
+            ...data,
+            id: newId,
+            page: pageIndex,
+            position: {
+              x: position.x - data.width / 2,
+              y: position.y - data.height / 2,
+            },
+          };
+          dispatch({ type: "ADD_SHAPE_ANNOTATION", annotation });
+          dispatch({ type: "SELECT_ANNOTATION", id: newId });
+          break;
+        }
       }
     },
     [state.clipboard]
@@ -859,8 +968,10 @@ export function useEditorState() {
       dispatch({ type: "REMOVE_STRIKETHROUGH", id });
     } else if (state.redactionAnnotations.find((a) => a.id === id)) {
       dispatch({ type: "REMOVE_REDACTION", id });
+    } else if (state.shapeAnnotations.find((a) => a.id === id)) {
+      dispatch({ type: "REMOVE_SHAPE_ANNOTATION", id });
     }
-  }, [state.selectedAnnotationId, state.textAnnotations, state.signatureAnnotations, state.highlightAnnotations, state.strikethroughAnnotations, state.redactionAnnotations]);
+  }, [state.selectedAnnotationId, state.textAnnotations, state.signatureAnnotations, state.highlightAnnotations, state.strikethroughAnnotations, state.redactionAnnotations, state.shapeAnnotations]);
 
   // Get current state as a snapshot for saving to multi-document state
   const getSnapshot = useCallback((): EditorSnapshot => {
@@ -871,8 +982,10 @@ export function useEditorState() {
       highlightAnnotations: state.highlightAnnotations,
       strikethroughAnnotations: state.strikethroughAnnotations,
       redactionAnnotations: state.redactionAnnotations,
+      shapeAnnotations: state.shapeAnnotations,
       selectedAnnotationId: state.selectedAnnotationId,
       activeTool: state.activeTool,
+      activeShapeType: state.activeShapeType,
       clipboard: state.clipboard,
       historyLength: past.length,
     };
@@ -902,11 +1015,15 @@ export function useEditorState() {
     addRedaction,
     removeRedaction,
     toggleRedaction,
+    addShapeAnnotation,
+    updateShapeAnnotation,
+    removeShapeAnnotation,
     setFormField,
     setScale,
     // Alias for zoom hook compatibility
     commitZoom: setScale,
     setActiveTool,
+    setActiveShapeType,
     selectAnnotation,
     reset,
     copySelectedAnnotation,

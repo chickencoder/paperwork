@@ -11,7 +11,18 @@ import {
   Download,
   Undo2,
   Redo2,
+  Square,
+  Circle,
+  Minus,
+  ArrowRight,
+  ChevronDown,
+  Shapes,
+  Triangle,
+  Star,
+  Hexagon,
+  MessageSquare,
 } from "lucide-react";
+import type { ShapeType } from "@/lib/pdf/types";
 import { cn } from "@/lib/utils";
 import {
   Popover,
@@ -24,13 +35,32 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import { SignaturePopover } from "./signature/signature-popover";
 import { MicroAppCombobox, MicroApp } from "@/components/micro-apps";
 
+// Shape type options with icons and labels
+const SHAPE_OPTIONS: { type: ShapeType; icon: React.ReactNode; label: string }[] = [
+  { type: "rectangle", icon: <Square className="w-4 h-4" />, label: "Rectangle" },
+  { type: "ellipse", icon: <Circle className="w-4 h-4" />, label: "Ellipse" },
+  { type: "triangle", icon: <Triangle className="w-4 h-4" />, label: "Triangle" },
+  { type: "star", icon: <Star className="w-4 h-4" />, label: "Star" },
+  { type: "hexagon", icon: <Hexagon className="w-4 h-4" />, label: "Hexagon" },
+  { type: "callout", icon: <MessageSquare className="w-4 h-4" />, label: "Callout" },
+  { type: "line", icon: <Minus className="w-4 h-4" />, label: "Line" },
+  { type: "arrow", icon: <ArrowRight className="w-4 h-4" />, label: "Arrow" },
+];
+
 interface ToolbarProps {
   scale: number;
-  activeTool: "select" | "text-insert" | "signature";
+  activeTool: "select" | "text-insert" | "signature" | "shape";
+  activeShapeType: ShapeType;
   fileName: string;
   isSignaturePopoverOpen: boolean;
   canUndo: boolean;
@@ -42,7 +72,8 @@ interface ToolbarProps {
   onRedo: () => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
-  onToolChange: (tool: "select" | "text-insert" | "signature") => void;
+  onToolChange: (tool: "select" | "text-insert" | "signature" | "shape") => void;
+  onShapeTypeChange: (shapeType: ShapeType) => void;
   onSignaturePopoverChange: (open: boolean) => void;
   onSignatureCreated: (dataUrl: string) => void;
   onDownload: (options: { rasterize: boolean; hasRedactions: boolean }) => void;
@@ -52,6 +83,7 @@ interface ToolbarProps {
 export function Toolbar({
   scale,
   activeTool,
+  activeShapeType,
   isSignaturePopoverOpen,
   canUndo,
   canRedo,
@@ -63,6 +95,7 @@ export function Toolbar({
   onZoomIn,
   onZoomOut,
   onToolChange,
+  onShapeTypeChange,
   onSignaturePopoverChange,
   onSignatureCreated,
   onDownload,
@@ -80,7 +113,8 @@ export function Toolbar({
     <TooltipProvider delayDuration={400}>
       <motion.div
         className={cn(
-          "sticky z-[70] flex justify-center pointer-events-none",
+          "sticky z-[70] justify-center pointer-events-none",
+          "hidden md:flex",
           hasTabBar ? "top-12" : "top-4"
         )}
         initial={isEntering ? { opacity: 0, y: -20 } : false}
@@ -131,6 +165,47 @@ export function Toolbar({
               <p>Add Signature</p>
             </TooltipContent>
           </Tooltip>
+
+          {/* Shape tool with dropdown */}
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className={cn(
+                      "flex items-center gap-0.5 p-2 pr-1 rounded-full transition-all duration-150",
+                      "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      activeTool === "shape"
+                        ? "bg-accent text-accent-foreground"
+                        : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                    )}
+                  >
+                    <Shapes className="w-4 h-4" />
+                    <ChevronDown className="w-3 h-3" />
+                  </button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>Add Shape</p>
+              </TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="start" sideOffset={8}>
+              {SHAPE_OPTIONS.map((option) => (
+                <DropdownMenuItem
+                  key={option.type}
+                  onClick={() => {
+                    onShapeTypeChange(option.type);
+                    onToolChange("shape");
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  {option.icon}
+                  <span>{option.label}</span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <Divider />
 

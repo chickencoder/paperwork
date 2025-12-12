@@ -5,6 +5,8 @@ import type {
   HighlightAnnotation,
   StrikethroughAnnotation,
   RedactionAnnotation,
+  ShapeAnnotation,
+  ShapeType,
 } from "@/lib/pdf/types";
 
 // Unique identifier for each tab/document session
@@ -16,7 +18,8 @@ type ClipboardAnnotation =
   | { type: "signature"; data: Omit<SignatureAnnotation, "id"> }
   | { type: "highlight"; data: Omit<HighlightAnnotation, "id"> }
   | { type: "strikethrough"; data: Omit<StrikethroughAnnotation, "id"> }
-  | { type: "redaction"; data: Omit<RedactionAnnotation, "id"> };
+  | { type: "redaction"; data: Omit<RedactionAnnotation, "id"> }
+  | { type: "shape"; data: Omit<ShapeAnnotation, "id"> };
 
 // Editor state snapshot (what we persist per tab)
 export interface EditorSnapshot {
@@ -26,8 +29,10 @@ export interface EditorSnapshot {
   highlightAnnotations: HighlightAnnotation[];
   strikethroughAnnotations: StrikethroughAnnotation[];
   redactionAnnotations: RedactionAnnotation[];
+  shapeAnnotations: ShapeAnnotation[];
   selectedAnnotationId: string | null;
-  activeTool: "select" | "text-insert" | "signature";
+  activeTool: "select" | "text-insert" | "signature" | "shape";
+  activeShapeType: ShapeType;
   clipboard: ClipboardAnnotation | null;
   // History for undo/redo preserved per tab
   historyLength: number; // Track if there are undoable changes
@@ -57,8 +62,10 @@ function createDefaultSnapshot(): EditorSnapshot {
     highlightAnnotations: [],
     strikethroughAnnotations: [],
     redactionAnnotations: [],
+    shapeAnnotations: [],
     selectedAnnotationId: null,
     activeTool: "select",
+    activeShapeType: "rectangle",
     clipboard: null,
     historyLength: 0,
   };

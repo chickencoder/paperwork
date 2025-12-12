@@ -1,6 +1,5 @@
-import { redirect } from "next/navigation";
+import { EditorEmptyState } from "@/components/editor/editor-empty-state";
 
-// Redirect /editor to homepage - sessions require a session ID
 export default function EditorPage() {
-  redirect("/");
+  return <EditorEmptyState />;
 }

@@ -3,11 +3,18 @@
 import { useState, useCallback } from "react";
 import { Pen, Type } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import { SignatureDrawPad } from "./signature-draw-pad";
 import { SignatureTypePad } from "./signature-type-pad";
 
@@ -28,6 +35,7 @@ export function SignaturePopover({
 }: SignaturePopoverProps) {
   const [createMode, setCreateMode] = useState<CreateMode>("type");
   const [signatureData, setSignatureData] = useState<string | null>(null);
+  const isMobile = useIsMobile();
 
   // Handle open change and reset state when opening
   const handleOpenChange = useCallback(
@@ -48,6 +56,94 @@ export function SignaturePopover({
     onOpenChange(false);
   }, [signatureData, onSignatureCreated, onOpenChange]);
 
+  const signatureContent = (
+    <>
+      {/* Content */}
+      <div className="p-3 space-y-3">
+        {/* Mode Toggle */}
+        <div className="flex gap-1 p-1 bg-muted rounded-lg">
+          <button
+            type="button"
+            onClick={() => {
+              setCreateMode("type");
+              setSignatureData(null);
+            }}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-2 py-2 md:py-2 py-3 px-3 rounded-md",
+              "text-sm transition-all",
+              createMode === "type"
+                ? "bg-card shadow-sm text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Type className="w-4 h-4" />
+            Type
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setCreateMode("draw");
+              setSignatureData(null);
+            }}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-2 py-2 md:py-2 py-3 px-3 rounded-md",
+              "text-sm transition-all",
+              createMode === "draw"
+                ? "bg-card shadow-sm text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Pen className="w-4 h-4" />
+            Draw
+          </button>
+        </div>
+
+        {/* Type or Draw Pad */}
+        {createMode === "type" ? (
+          <SignatureTypePad onSignatureChange={setSignatureData} />
+        ) : (
+          <SignatureDrawPad onSignatureChange={setSignatureData} />
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="px-4 py-3 md:py-3 py-4 border-t border-border">
+        <button
+          type="button"
+          onClick={handleUseSignature}
+          disabled={!signatureData}
+          className={cn(
+            "w-full px-4 py-2 md:py-2 py-3 rounded-full text-sm font-medium",
+            "transition-all",
+            signatureData
+              ? "bg-primary text-primary-foreground hover:bg-primary/90"
+              : "bg-secondary text-muted-foreground cursor-not-allowed"
+          )}
+        >
+          Add to Document
+        </button>
+      </div>
+    </>
+  );
+
+  // Mobile: use Drawer
+  if (isMobile) {
+    return (
+      <>
+        <span onClick={() => handleOpenChange(true)}>{children}</span>
+        <Drawer open={open} onOpenChange={handleOpenChange}>
+          <DrawerContent className="max-h-[85vh]">
+            <DrawerHeader className="pb-0">
+              <DrawerTitle>Add Signature</DrawerTitle>
+            </DrawerHeader>
+            {signatureContent}
+          </DrawerContent>
+        </Drawer>
+      </>
+    );
+  }
+
+  // Desktop: use Popover
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>{children}</PopoverTrigger>
@@ -56,71 +152,7 @@ export function SignaturePopover({
         sideOffset={12}
         className="w-80 p-0 rounded-2xl"
       >
-        {/* Content */}
-        <div className="p-3 space-y-3">
-          {/* Mode Toggle */}
-          <div className="flex gap-1 p-1 bg-muted rounded-lg">
-            <button
-              type="button"
-              onClick={() => {
-                setCreateMode("type");
-                setSignatureData(null);
-              }}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md",
-                "text-sm transition-all",
-                createMode === "type"
-                  ? "bg-card shadow-sm text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Type className="w-4 h-4" />
-              Type
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setCreateMode("draw");
-                setSignatureData(null);
-              }}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md",
-                "text-sm transition-all",
-                createMode === "draw"
-                  ? "bg-card shadow-sm text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Pen className="w-4 h-4" />
-              Draw
-            </button>
-          </div>
-
-          {/* Type or Draw Pad */}
-          {createMode === "type" ? (
-            <SignatureTypePad onSignatureChange={setSignatureData} />
-          ) : (
-            <SignatureDrawPad onSignatureChange={setSignatureData} />
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="px-4 py-3 border-t border-border">
-          <button
-            type="button"
-            onClick={handleUseSignature}
-            disabled={!signatureData}
-            className={cn(
-              "w-full px-4 py-2 rounded-full text-sm font-medium",
-              "transition-all",
-              signatureData
-                ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                : "bg-secondary text-muted-foreground cursor-not-allowed"
-            )}
-          >
-            Add to Document
-          </button>
-        </div>
+        {signatureContent}
       </PopoverContent>
     </Popover>
   );

@@ -64,7 +64,11 @@ export interface TextAnnotation {
   color: TextAnnotationColor;
   textAlign: TextAlign;
   width?: number; // Optional width for multi-line text wrapping
+  rotation?: number; // Rotation in degrees (0-360)
 }
+
+// Signature colors - simple set for signature use
+export type SignatureColor = "black" | "navy" | "blue" | "dark-red" | "dark-green" | "purple";
 
 export interface SignatureAnnotation {
   id: string;
@@ -73,6 +77,8 @@ export interface SignatureAnnotation {
   width: number;
   height: number;
   dataUrl: string; // PNG data URL of the signature
+  rotation?: number; // Rotation in degrees (0-360)
+  color?: SignatureColor; // Color to tint the signature (default: black)
 }
 
 // Annotation rect for highlight/strikethrough (can span multiple lines)
@@ -84,6 +90,46 @@ export interface AnnotationRect {
 }
 
 export type HighlightColor = "yellow" | "green" | "blue" | "pink" | "orange";
+
+// Shape annotation types
+export type ShapeType = "rectangle" | "ellipse" | "line" | "arrow" | "triangle" | "star" | "hexagon" | "callout";
+
+// Shape colors - same as text annotation colors plus transparent
+export type ShapeColor =
+  | "transparent"
+  | "black"
+  | "dark-gray"
+  | "gray"
+  | "light-gray"
+  | "navy"
+  | "blue"
+  | "sky"
+  | "dark-red"
+  | "red"
+  | "coral"
+  | "dark-green"
+  | "green"
+  | "teal"
+  | "brown"
+  | "orange"
+  | "amber"
+  | "purple"
+  | "pink"
+  | "magenta";
+
+export interface ShapeAnnotation {
+  id: string;
+  page: number;
+  shapeType: ShapeType;
+  position: { x: number; y: number }; // Top-left for rect/ellipse, start for line/arrow
+  width: number; // For line/arrow: dx to end point
+  height: number; // For line/arrow: dy to end point
+  fillColor: ShapeColor;
+  strokeColor: ShapeColor;
+  strokeWidth: number; // 1-10px
+  opacity: number; // 0-100%
+  rotation?: number; // Rotation in degrees (0-360)
+}
 
 export interface HighlightAnnotation {
   id: string;
@@ -124,7 +170,9 @@ export interface EditorState {
   fieldValues: Record<string, FieldValue>;
   textAnnotations: TextAnnotation[];
   selectedFieldId: string | null;
-  activeTool: "select" | "text-insert";
+  activeTool: "select" | "text-insert" | "signature" | "shape";
+  activeShapeType: ShapeType;
+  shapeAnnotations: ShapeAnnotation[];
   isDirty: boolean;
 }
 

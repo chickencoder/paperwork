@@ -2,13 +2,12 @@
 
 import { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { nanoid } from "nanoid";
-import { Upload, ArrowRight, Check } from "lucide-react";
+import { Upload, ArrowRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { savePendingPdf } from "@/lib/storage/persistence";
-import { ToolsNavigation } from "./tools-dropdown";
+import { HomepageNavbar } from "./homepage-navbar";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -180,41 +179,18 @@ export function ToolLandingDialog({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.3 }}
-          className="relative z-40 min-h-screen bg-background"
+          className="relative z-40 bg-background"
           onDragEnter={handleDragEnter}
           onDragLeave={handleDragLeave}
           onDragOver={handleDragOver}
           onDrop={handleDrop}
         >
-          {/* Floating Header Bar */}
-          <motion.header
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1, duration: 0.5 }}
-            className="fixed top-4 left-0 right-0 z-50 px-6 lg:px-12"
-          >
-            <div className="w-full max-w-7xl mx-auto flex items-center justify-between bg-popover/90 backdrop-blur-md rounded-full shadow-md shadow-black/5 dark:shadow-black/20 border border-border/60 px-6 py-3">
-              {/* Logo */}
-              <Link href="/" className="px-2">
-                <span
-                  className="text-xl sm:text-2xl text-foreground font-medium"
-                  style={{
-                    fontFamily: "'Fraunces', serif",
-                    letterSpacing: "-0.02em",
-                  }}
-                >
-                  Paperwork
-                </span>
-              </Link>
-
-              {/* Category dropdowns */}
-              <ToolsNavigation />
-            </div>
-          </motion.header>
+          {/* Navbar - same as homepage */}
+          <HomepageNavbar />
 
           {/* Main content - Two column hero */}
-          <div className="min-h-screen flex items-center">
-            <div className="w-full max-w-7xl mx-auto px-6 lg:px-12 pt-24 pb-12">
+          <div className="flex items-center">
+            <div className="w-full max-w-7xl mx-auto px-6 lg:px-12 pt-24 sm:pt-32 pb-8 sm:pb-12">
               <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
 
                 {/* Left column - Content */}
@@ -289,31 +265,8 @@ export function ToolLandingDialog({
                       </span>
                     </Button>
                     <p className="text-sm text-muted-foreground/70 mt-4">
-                      or drag and drop anywhere on this page
+                      100% free · No signup · Private
                     </p>
-                  </motion.div>
-
-                  {/* Features */}
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.5, duration: 0.6 }}
-                    className="flex flex-wrap gap-3 mt-10"
-                  >
-                    {config.features.map((feature, index) => (
-                      <motion.div
-                        key={index}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.55 + index * 0.08, duration: 0.4 }}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 bg-muted/50 border border-border rounded-full"
-                      >
-                        <div className="w-4 h-4 rounded-full bg-muted flex items-center justify-center">
-                          <Check className="w-2.5 h-2.5 text-muted-foreground" />
-                        </div>
-                        <span className="text-xs text-muted-foreground">{feature.title}</span>
-                      </motion.div>
-                    ))}
                   </motion.div>
                 </motion.div>
 

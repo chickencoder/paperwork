@@ -4,6 +4,13 @@ import { useRef, useEffect } from "react";
 import { motion, AnimatePresence, useDragControls } from "framer-motion";
 import { X, GripHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-is-mobile";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 
 interface DraggableWindowProps {
   open: boolean;
@@ -22,11 +29,14 @@ export function DraggableWindow({
   className,
   width = 360,
 }: DraggableWindowProps) {
+  const isMobile = useIsMobile();
   const constraintsRef = useRef<HTMLDivElement>(null);
   const dragControls = useDragControls();
 
-  // Handle escape key to close
+  // Handle escape key to close (desktop only - drawer handles its own)
   useEffect(() => {
+    if (isMobile) return;
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && open) {
         onClose();
@@ -34,8 +44,23 @@ export function DraggableWindow({
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [open, onClose]);
+  }, [open, onClose, isMobile]);
 
+  // Mobile: render as bottom drawer
+  if (isMobile) {
+    return (
+      <Drawer open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+        <DrawerContent className="max-h-[85vh]">
+          <DrawerHeader className="pb-2">
+            <DrawerTitle className="text-sm">{title}</DrawerTitle>
+          </DrawerHeader>
+          <div className="flex-1 overflow-auto px-4 pb-8">{children}</div>
+        </DrawerContent>
+      </Drawer>
+    );
+  }
+
+  // Desktop: render as draggable window
   return (
     <AnimatePresence>
       {open && (

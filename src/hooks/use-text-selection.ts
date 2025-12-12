@@ -173,8 +173,8 @@ export function useTextSelection({
     // Listen for selection changes
     document.addEventListener("selectionchange", handleSelectionChange);
 
-    // Also check on mouseup for more reliable detection
-    const handleMouseUp = () => {
+    // Also check on mouseup/touchend for more reliable detection
+    const handlePointerUp = () => {
       // Clear any pending timeout
       if (mouseUpTimeoutRef.current) {
         clearTimeout(mouseUpTimeoutRef.current);
@@ -182,11 +182,13 @@ export function useTextSelection({
       // Small delay to let selection finalize
       mouseUpTimeoutRef.current = setTimeout(handleSelectionChange, 10);
     };
-    document.addEventListener("mouseup", handleMouseUp);
+    document.addEventListener("mouseup", handlePointerUp);
+    document.addEventListener("touchend", handlePointerUp);
 
     return () => {
       document.removeEventListener("selectionchange", handleSelectionChange);
-      document.removeEventListener("mouseup", handleMouseUp);
+      document.removeEventListener("mouseup", handlePointerUp);
+      document.removeEventListener("touchend", handlePointerUp);
       // Cleanup timeout on unmount
       if (mouseUpTimeoutRef.current) {
         clearTimeout(mouseUpTimeoutRef.current);

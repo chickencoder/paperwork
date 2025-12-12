@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import { Trash2, Bold, Italic, Minus, Plus, AlignLeft, AlignCenter, AlignRight, ChevronDown, Type, Check } from "lucide-react";
+import { useState, useEffect, useRef, useCallback, memo } from "react";
+import { Trash2, Bold, Italic, Minus, Plus, AlignLeft, AlignCenter, AlignRight, ChevronDown, Type, Check, RotateCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { TextAnnotation, TextAnnotationColor, FontFamily } from "@/lib/pdf/types";
 import {
@@ -67,7 +67,7 @@ interface TextAnnotationOverlayProps {
   onRemove: () => void;
 }
 
-export function TextAnnotationOverlay({
+export const TextAnnotationOverlay = memo(function TextAnnotationOverlay({
   annotation,
   scale,
   cssScale = 1,
@@ -79,12 +79,17 @@ export function TextAnnotationOverlay({
   const [isEditing, setIsEditing] = useState(!annotation.text);
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
+  const [isRotating, setIsRotating] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [resizeStart, setResizeStart] = useState({ x: 0, width: 0 });
+  const [rotateStart, setRotateStart] = useState({ angle: 0, startAngle: 0 });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const colorPickerRef = useRef<HTMLDivElement>(null);
+
+  // Get rotation value (default to 0)
+  const rotation = annotation.rotation ?? 0;
 
   useEffect(() => {
     if (isEditing && textareaRef.current) {
@@ -129,63 +134,158 @@ export function TextAnnotationOverlay({
   // Effective scale combines the PDF render scale and CSS transform scale
   const effectiveScale = scale * cssScale;
 
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      if (isEditing || isResizing) return;
-      e.preventDefault();
-      e.stopPropagation();
+  // Unified handler for both mouse and touch
+  const handleDragStart = useCallback(
+    (clientX: number, clientY: number) => {
+      if (isEditing || isResizing || isRotating) return;
       onSelect();
       setIsDragging(true);
       setDragStart({
-        x: e.clientX - annotation.position.x * effectiveScale,
-        y: e.clientY - annotation.position.y * effectiveScale,
+        x: clientX - annotation.position.x * effectiveScale,
+        y: clientY - annotation.position.y * effectiveScale,
       });
     },
-    [isEditing, isResizing, annotation.position, effectiveScale, onSelect]
+    [isEditing, isResizing, isRotating, annotation.position, effectiveScale, onSelect]
   );
 
-  const handleResizeMouseDown = useCallback(
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (isEditing || isResizing || isRotating) return;
+      e.preventDefault();
+      e.stopPropagation();
+      handleDragStart(e.clientX, e.clientY);
+    },
+    [isEditing, isResizing, isRotating, handleDragStart]
+  );
+
+  const handleTouchStart = useCallback(
+    (e: React.TouchEvent) => {
+      if (isEditing || isResizing || isRotating) return;
+      e.stopPropagation();
+      const touch = e.touches[0];
+      handleDragStart(touch.clientX, touch.clientY);
+    },
+    [isEditing, isResizing, isRotating, handleDragStart]
+  );
+
+  // Get center of the element for rotation calculations
+  const getElementCenter = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return { x: 0, y: 0 };
+    const rect = container.getBoundingClientRect();
+    return {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    };
+  }, []);
+
+  // Rotation handlers
+  const handleRotateStart = useCallback(
+    (clientX: number, clientY: number) => {
+      const center = getElementCenter();
+      const startAngle = Math.atan2(clientY - center.y, clientX - center.x) * (180 / Math.PI);
+      setIsRotating(true);
+      setRotateStart({
+        angle: rotation,
+        startAngle,
+      });
+    },
+    [getElementCenter, rotation]
+  );
+
+  const handleRotateMouseDown = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
+      handleRotateStart(e.clientX, e.clientY);
+    },
+    [handleRotateStart]
+  );
+
+  const handleRotateTouchStart = useCallback(
+    (e: React.TouchEvent) => {
+      e.stopPropagation();
+      const touch = e.touches[0];
+      handleRotateStart(touch.clientX, touch.clientY);
+    },
+    [handleRotateStart]
+  );
+
+  // Unified resize handler
+  const handleResizeStart = useCallback(
+    (clientX: number) => {
       setIsResizing(true);
       // Use the actual rendered width if annotation.width isn't set
       const currentWidth = annotation.width || (containerRef.current?.offsetWidth ?? 150) / effectiveScale;
       setResizeStart({
-        x: e.clientX,
+        x: clientX,
         width: currentWidth,
       });
     },
     [annotation.width, effectiveScale]
   );
 
+  const handleResizeMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      handleResizeStart(e.clientX);
+    },
+    [handleResizeStart]
+  );
+
+  const handleResizeTouchStart = useCallback(
+    (e: React.TouchEvent) => {
+      e.stopPropagation();
+      const touch = e.touches[0];
+      handleResizeStart(touch.clientX);
+    },
+    [handleResizeStart]
+  );
+
+  // Handle dragging (mouse and touch)
   useEffect(() => {
     if (!isDragging) return;
 
-    const handleMouseMove = (e: MouseEvent) => {
-      const newX = (e.clientX - dragStart.x) / effectiveScale;
-      const newY = (e.clientY - dragStart.y) / effectiveScale;
+    const handleMove = (clientX: number, clientY: number) => {
+      const newX = (clientX - dragStart.x) / effectiveScale;
+      const newY = (clientY - dragStart.y) / effectiveScale;
       onUpdate({ position: { x: Math.max(0, newX), y: Math.max(0, newY) } });
     };
 
-    const handleMouseUp = () => {
+    const handleMouseMove = (e: MouseEvent) => {
+      handleMove(e.clientX, e.clientY);
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      handleMove(touch.clientX, touch.clientY);
+    };
+
+    const handleEnd = () => {
       setIsDragging(false);
     };
 
     document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
+    document.addEventListener("mouseup", handleEnd);
+    document.addEventListener("touchmove", handleTouchMove, { passive: false });
+    document.addEventListener("touchend", handleEnd);
 
     return () => {
       document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
+      document.removeEventListener("mouseup", handleEnd);
+      document.removeEventListener("touchmove", handleTouchMove);
+      document.removeEventListener("touchend", handleEnd);
     };
   }, [isDragging, dragStart, effectiveScale, onUpdate]);
 
+  // Handle resizing (mouse and touch)
   useEffect(() => {
     if (!isResizing) return;
 
-    const handleMouseMove = (e: MouseEvent) => {
-      const deltaX = e.clientX - resizeStart.x;
+    const handleResize = (clientX: number) => {
+      const deltaX = clientX - resizeStart.x;
       // Only update if there's meaningful movement (more than 2px)
       if (Math.abs(deltaX) > 2) {
         const newWidth = Math.max(20, resizeStart.width + deltaX / effectiveScale);
@@ -193,18 +293,73 @@ export function TextAnnotationOverlay({
       }
     };
 
-    const handleMouseUp = () => {
+    const handleMouseMove = (e: MouseEvent) => {
+      handleResize(e.clientX);
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      handleResize(touch.clientX);
+    };
+
+    const handleEnd = () => {
       setIsResizing(false);
     };
 
     document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
+    document.addEventListener("mouseup", handleEnd);
+    document.addEventListener("touchmove", handleTouchMove, { passive: false });
+    document.addEventListener("touchend", handleEnd);
 
     return () => {
       document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
+      document.removeEventListener("mouseup", handleEnd);
+      document.removeEventListener("touchmove", handleTouchMove);
+      document.removeEventListener("touchend", handleEnd);
     };
   }, [isResizing, resizeStart, effectiveScale, onUpdate]);
+
+  // Handle rotation (mouse and touch)
+  useEffect(() => {
+    if (!isRotating) return;
+
+    const handleRotate = (clientX: number, clientY: number) => {
+      const center = getElementCenter();
+      const currentAngle = Math.atan2(clientY - center.y, clientX - center.x) * (180 / Math.PI);
+      const deltaAngle = currentAngle - rotateStart.startAngle;
+      let newRotation = (rotateStart.angle + deltaAngle) % 360;
+      if (newRotation < 0) newRotation += 360;
+
+      onUpdate({ rotation: Math.round(newRotation) });
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      handleRotate(e.clientX, e.clientY);
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      handleRotate(touch.clientX, touch.clientY);
+    };
+
+    const handleEnd = () => {
+      setIsRotating(false);
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleEnd);
+    document.addEventListener("touchmove", handleTouchMove, { passive: false });
+    document.addEventListener("touchend", handleEnd);
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleEnd);
+      document.removeEventListener("touchmove", handleTouchMove);
+      document.removeEventListener("touchend", handleEnd);
+    };
+  }, [isRotating, rotateStart, getElementCenter, onUpdate]);
 
   const toggleBold = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -276,9 +431,11 @@ export function TextAnnotationOverlay({
         top: annotation.position.y * scale,
         fontSize: annotation.fontSize * scale,
         fontWeight: annotation.fontWeight,
-        cursor: isDragging ? "grabbing" : isEditing ? "text" : "default",
+        cursor: isDragging ? "grabbing" : isRotating ? "grabbing" : isEditing ? "text" : "default",
         zIndex: isSelected ? 50 : 10,
         width: scaledWidth,
+        transform: rotation ? `rotate(${rotation}deg)` : undefined,
+        transformOrigin: "center center",
       }}
       onClick={(e) => {
         e.stopPropagation();
@@ -286,7 +443,39 @@ export function TextAnnotationOverlay({
       }}
       onDoubleClick={() => setIsEditing(true)}
       onMouseDown={handleMouseDown}
+      onTouchStart={handleTouchStart}
     >
+      {/* Rotation handle - shows when selected but not editing */}
+      {isSelected && !isEditing && (
+        <div
+          className="absolute left-1/2 flex flex-col items-center"
+          style={{
+            top: -40 / cssScale,
+            transform: `translateX(-50%) scale(${1 / cssScale}) rotate(${-rotation}deg)`,
+            transformOrigin: "center bottom",
+          }}
+        >
+          {/* Connector line */}
+          <div className="w-px h-4 bg-border" />
+          {/* Rotation handle */}
+          <div
+            onMouseDown={handleRotateMouseDown}
+            onTouchStart={handleRotateTouchStart}
+            className={cn(
+              "w-5 h-5 rounded-full",
+              "bg-popover hover:bg-accent",
+              "border-2 border-border shadow",
+              "cursor-grab active:cursor-grabbing",
+              "flex items-center justify-center",
+              "touch-none"
+            )}
+            title={`Rotation: ${rotation}°`}
+          >
+            <RotateCw className="w-3 h-3 text-muted-foreground" />
+          </div>
+        </div>
+      )}
+
       {/* Inline formatting toolbar - shows above when selected */}
       {isSelected && !isEditing && (
         <div
@@ -301,8 +490,8 @@ export function TextAnnotationOverlay({
             // The toolbar is inside the scaled container, so we counter-scale it
             // Use bottom: 100% to position above the annotation, then add margin
             bottom: "100%",
-            marginBottom: 8 / cssScale,
-            transform: `translateX(-50%) scale(${1 / cssScale})`,
+            marginBottom: 48 / cssScale,
+            transform: `translateX(-50%) scale(${1 / cssScale}) rotate(${-rotation}deg)`,
             transformOrigin: "center bottom",
           }}
           onMouseDown={(e) => e.stopPropagation()}
@@ -578,13 +767,15 @@ export function TextAnnotationOverlay({
           {isSelected && (
             <div
               onMouseDown={handleResizeMouseDown}
+              onTouchStart={handleResizeTouchStart}
               className={cn(
                 "absolute top-1/2",
-                "w-4 h-4 rounded-full",
+                "w-4 h-4 md:w-4 md:h-4 w-6 h-6 rounded-full",
                 "bg-primary hover:bg-primary/80",
                 "cursor-ew-resize",
                 "transition-colors",
-                "border-2 border-white shadow"
+                "border-2 border-white shadow",
+                "touch-none"
               )}
               style={{
                 right: -6 / cssScale,
@@ -597,4 +788,4 @@ export function TextAnnotationOverlay({
       )}
     </div>
   );
-}
+});

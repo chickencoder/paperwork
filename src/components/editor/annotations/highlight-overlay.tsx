@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, memo } from "react";
 import { Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { HighlightAnnotation, HighlightColor } from "@/lib/pdf/types";
@@ -22,7 +22,7 @@ interface HighlightOverlayProps {
   onRemove: () => void;
 }
 
-export function HighlightOverlay({
+export const HighlightOverlay = memo(function HighlightOverlay({
   annotation,
   scale,
   cssScale = 1,
@@ -141,4 +141,4 @@ export function HighlightOverlay({
       )}
     </div>
   );
-}
+});

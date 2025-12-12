@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, memo } from "react";
 import { Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { StrikethroughAnnotation, StrikethroughColor } from "@/lib/pdf/types";
@@ -19,7 +19,7 @@ interface StrikethroughOverlayProps {
   onRemove: () => void;
 }
 
-export function StrikethroughOverlay({
+export const StrikethroughOverlay = memo(function StrikethroughOverlay({
   annotation,
   scale,
   cssScale = 1,
@@ -152,4 +152,4 @@ export function StrikethroughOverlay({
       )}
     </div>
   );
-}
+});

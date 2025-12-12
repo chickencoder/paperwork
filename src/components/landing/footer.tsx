@@ -100,6 +100,9 @@ export function Footer() {
             © {currentYear} Paperwork. All rights reserved.
           </p>
           <div className="flex items-center gap-6">
+            <Link href="/blog" className="text-muted-foreground/70 hover:text-muted-foreground text-sm transition-colors">
+              Blog
+            </Link>
             <Link href="/" className="text-muted-foreground/70 hover:text-muted-foreground text-sm transition-colors">
               Privacy
             </Link>

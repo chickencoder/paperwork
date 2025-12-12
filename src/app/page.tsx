@@ -1,42 +1,23 @@
 "use client";
 
-import { useState } from "react";
-import { Shield, Sparkles, Zap } from "lucide-react";
-import { ToolLandingDialog, type ToolLandingConfig } from "@/components/landing/tool-landing-dialog";
-import { HomepageContent } from "@/components/landing/homepage-content";
+import { HomepageNavbar } from "@/components/landing/homepage-navbar";
+import { HomepageHero } from "@/components/landing/homepage-hero";
+import { UseCasesSection } from "@/components/landing/use-cases-section";
+import { TestimonialsSection } from "@/components/landing/testimonials-section";
+import { HomepageFaq } from "@/components/landing/homepage-faq";
+import { HomepageCta } from "@/components/landing/homepage-cta";
 import { Footer } from "@/components/landing/footer";
-import { HomepageHeroVisual } from "@/components/landing/hero-visuals";
-
-const homepageConfig: ToolLandingConfig = {
-  headline: "AI-Powered PDF Editor",
-  description: "Edit, sign, and transform your documents with intelligent tools that understand your content. Runs entirely in your browser—your files never leave your device.",
-  buttonText: "Open PDF",
-  buttonTextDragging: "Drop to open",
-  eyebrow: "Free & Private",
-  features: [
-    { icon: Sparkles, title: "AI-Powered", description: "Smart tools that understand your documents" },
-    { icon: Shield, title: "100% Private", description: "Files never leave your device" },
-    { icon: Zap, title: "No Signup", description: "Start editing immediately" },
-  ],
-};
 
 export default function HomePage() {
-  const [isTransitioning, setIsTransitioning] = useState(false);
-
   return (
-    <main className="relative">
-      <ToolLandingDialog
-        config={homepageConfig}
-        onTransitionStart={() => setIsTransitioning(true)}
-        heroVisual={<HomepageHeroVisual />}
-      />
-
-      {!isTransitioning && (
-        <>
-          <HomepageContent />
-          <Footer />
-        </>
-      )}
+    <main className="relative bg-background">
+      <HomepageNavbar />
+      <HomepageHero />
+      <UseCasesSection />
+      <TestimonialsSection />
+      <HomepageFaq />
+      <HomepageCta />
+      <Footer />
     </main>
   );
 }

@@ -30,10 +30,8 @@ export function SignatureDrawPad({ onSignatureChange }: SignatureDrawPadProps) {
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
       ctx.lineWidth = 2;
-      // Use CSS variable value or fallback to dark color for signature
-      ctx.strokeStyle = getComputedStyle(document.documentElement)
-        .getPropertyValue('--foreground')
-        .trim() || "#0a0a0a";
+      // Always use black for signature (color can be changed after placing)
+      ctx.strokeStyle = "#1a1a1a";
     }
   }, []);
 

@@ -12,12 +12,15 @@ import type {
   HighlightAnnotation,
   StrikethroughAnnotation,
   RedactionAnnotation,
+  ShapeAnnotation,
+  ShapeType,
 } from "@/lib/pdf/types";
 import { TextAnnotationOverlay } from "./fields/text-annotation";
 import { SignatureAnnotationOverlay } from "./fields/signature-annotation";
 import { HighlightOverlay } from "./annotations/highlight-overlay";
 import { StrikethroughOverlay } from "./annotations/strikethrough-overlay";
 import { RedactionOverlay } from "./annotations/redaction-overlay";
+import { ShapeAnnotationOverlay, getShapeColorHex } from "./annotations/shape-annotation";
 import { PageSkeleton } from "./page-skeleton";
 import { useVirtualizedPages } from "@/hooks/use-virtualized-pages";
 
@@ -56,7 +59,9 @@ interface PDFViewerProps {
   highlightAnnotations: HighlightAnnotation[];
   strikethroughAnnotations: StrikethroughAnnotation[];
   redactionAnnotations: RedactionAnnotation[];
-  activeTool: "select" | "text-insert" | "signature";
+  shapeAnnotations: ShapeAnnotation[];
+  activeTool: "select" | "text-insert" | "signature" | "shape";
+  activeShapeType: ShapeType;
   selectedAnnotationId: string | null;
   pendingSignatureData: string | null;
   onAddTextAnnotation: (annotation: TextAnnotation) => void;
@@ -71,11 +76,17 @@ interface PDFViewerProps {
     updates: Partial<Omit<SignatureAnnotation, "id" | "page" | "dataUrl">>
   ) => void;
   onRemoveSignatureAnnotation: (id: string) => void;
+  onAddShapeAnnotation: (annotation: ShapeAnnotation) => void;
+  onUpdateShapeAnnotation: (
+    id: string,
+    updates: Partial<Omit<ShapeAnnotation, "id" | "page">>
+  ) => void;
+  onRemoveShapeAnnotation: (id: string) => void;
   onRemoveHighlight: (id: string) => void;
   onRemoveStrikethrough: (id: string) => void;
   onRemoveRedaction: (id: string) => void;
   onSelectAnnotation: (id: string | null) => void;
-  onToolChange: (tool: "select" | "text-insert" | "signature") => void;
+  onToolChange: (tool: "select" | "text-insert" | "signature" | "shape") => void;
   onSignaturePlaced: () => void;
   onFormFieldChange?: (fieldId: string, value: string | boolean, previousValue: string | boolean) => void;
   onDocumentLoad?: (numPages: number) => void;
@@ -90,6 +101,7 @@ interface AnnotationsByPage {
   highlight: HighlightAnnotation[];
   strikethrough: StrikethroughAnnotation[];
   redaction: RedactionAnnotation[];
+  shape: ShapeAnnotation[];
 }
 
 export interface PDFViewerHandle {
@@ -109,7 +121,9 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
       highlightAnnotations,
       strikethroughAnnotations,
       redactionAnnotations,
+      shapeAnnotations,
       activeTool,
+      activeShapeType,
       selectedAnnotationId,
       pendingSignatureData,
       onAddTextAnnotation,
@@ -118,6 +132,9 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
       onAddSignatureAnnotation,
       onUpdateSignatureAnnotation,
       onRemoveSignatureAnnotation,
+      onAddShapeAnnotation,
+      onUpdateShapeAnnotation,
+      onRemoveShapeAnnotation,
       onRemoveHighlight,
       onRemoveStrikethrough,
       onRemoveRedaction,
@@ -133,6 +150,11 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
   ) {
     const [numPages, setNumPages] = useState<number>(0);
     const containerRef = useRef<HTMLDivElement>(null);
+
+    // Shape drawing state
+    const [isDrawingShape, setIsDrawingShape] = useState(false);
+    const [drawingStart, setDrawingStart] = useState<{ x: number; y: number; pageIndex: number } | null>(null);
+    const [drawingCurrent, setDrawingCurrent] = useState<{ x: number; y: number } | null>(null);
     // Track previous values for form fields (for undo)
     const formFieldValuesRef = useRef<Map<string, string | boolean>>(new Map());
 
@@ -161,6 +183,7 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
           highlight: [],
           strikethrough: [],
           redaction: [],
+          shape: [],
         });
       }
 
@@ -190,6 +213,11 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
         if (pageAnnotations) pageAnnotations.redaction.push(a);
       });
 
+      shapeAnnotations.forEach((a) => {
+        const pageAnnotations = map.get(a.page);
+        if (pageAnnotations) pageAnnotations.shape.push(a);
+      });
+
       return map;
     }, [
       numPages,
@@ -198,6 +226,7 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
       highlightAnnotations,
       strikethroughAnnotations,
       redactionAnnotations,
+      shapeAnnotations,
     ]);
 
     useImperativeHandle(ref, () => ({
@@ -283,8 +312,397 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
       [onDocumentLoad]
     );
 
+    // Helper to get coordinates from mouse/touch event on a page
+    const getPageCoordinates = useCallback(
+      (e: React.MouseEvent<HTMLDivElement> | MouseEvent | TouchEvent, pageElement: HTMLElement) => {
+        const rect = pageElement.getBoundingClientRect();
+        const effectiveScale = scale * cssScale;
+        let clientX: number, clientY: number;
+
+        if ('touches' in e) {
+          clientX = e.touches[0].clientX;
+          clientY = e.touches[0].clientY;
+        } else {
+          clientX = e.clientX;
+          clientY = e.clientY;
+        }
+
+        return {
+          x: (clientX - rect.left) / effectiveScale,
+          y: (clientY - rect.top) / effectiveScale,
+        };
+      },
+      [scale, cssScale]
+    );
+
+    // Handle mouse down for shape drawing
+    const handlePageMouseDown = useCallback(
+      (e: React.MouseEvent<HTMLDivElement>, pageIndex: number) => {
+        if (activeTool !== "shape") return;
+
+        const target = e.target as HTMLElement;
+        // Don't start drawing if clicking on form fields or existing annotations
+        if (
+          target.tagName === "INPUT" ||
+          target.tagName === "SELECT" ||
+          target.tagName === "TEXTAREA" ||
+          target.closest(".annotationLayer") ||
+          target.closest("[data-annotation]")
+        ) {
+          return;
+        }
+
+        // If a shape is selected, deselect it and switch back to select tool
+        if (selectedAnnotationId) {
+          onSelectAnnotation(null);
+          onToolChange("select");
+          return;
+        }
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        const coords = getPageCoordinates(e, e.currentTarget);
+        setIsDrawingShape(true);
+        setDrawingStart({ ...coords, pageIndex });
+        setDrawingCurrent(coords);
+      },
+      [activeTool, getPageCoordinates, selectedAnnotationId, onSelectAnnotation, onToolChange]
+    );
+
+    // Handle touch start for shape drawing
+    const handlePageTouchStart = useCallback(
+      (e: React.TouchEvent<HTMLDivElement>, pageIndex: number) => {
+        if (activeTool !== "shape") return;
+
+        const target = e.target as HTMLElement;
+        if (
+          target.tagName === "INPUT" ||
+          target.tagName === "SELECT" ||
+          target.tagName === "TEXTAREA" ||
+          target.closest(".annotationLayer") ||
+          target.closest("[data-annotation]")
+        ) {
+          return;
+        }
+
+        // If a shape is selected, deselect it and switch back to select tool
+        if (selectedAnnotationId) {
+          onSelectAnnotation(null);
+          onToolChange("select");
+          return;
+        }
+
+        e.stopPropagation();
+
+        const coords = getPageCoordinates(e.nativeEvent, e.currentTarget);
+        setIsDrawingShape(true);
+        setDrawingStart({ ...coords, pageIndex });
+        setDrawingCurrent(coords);
+      },
+      [activeTool, getPageCoordinates, selectedAnnotationId, onSelectAnnotation, onToolChange]
+    );
+
+    // Handle drawing move and end
+    useEffect(() => {
+      if (!isDrawingShape || !drawingStart) return;
+
+      const handleMove = (e: MouseEvent | TouchEvent) => {
+        e.preventDefault();
+        const pageElement = containerRef.current?.querySelector(
+          `[data-page-index="${drawingStart.pageIndex}"]`
+        ) as HTMLElement;
+        if (!pageElement) return;
+
+        const coords = getPageCoordinates(e, pageElement);
+        setDrawingCurrent(coords);
+      };
+
+      const handleEnd = () => {
+        if (!drawingStart || !drawingCurrent) {
+          setIsDrawingShape(false);
+          setDrawingStart(null);
+          setDrawingCurrent(null);
+          return;
+        }
+
+        // Calculate shape dimensions
+        const width = drawingCurrent.x - drawingStart.x;
+        const height = drawingCurrent.y - drawingStart.y;
+
+        // Check if user dragged to create shape or just clicked
+        const isLine = activeShapeType === "line" || activeShapeType === "arrow";
+        const minSize = 5;
+        const hasMinSize = isLine
+          ? Math.abs(width) > minSize || Math.abs(height) > minSize
+          : Math.abs(width) > minSize && Math.abs(height) > minSize;
+
+        // Default sizes for click-to-place (sensible defaults)
+        const defaultRectSize = 100;
+        const defaultLineLength = 100;
+
+        let posX = drawingStart.x;
+        let posY = drawingStart.y;
+        let shapeWidth: number;
+        let shapeHeight: number;
+
+        if (hasMinSize) {
+          // User dragged - use their dimensions
+          shapeWidth = width;
+          shapeHeight = height;
+
+          if (!isLine) {
+            if (width < 0) {
+              posX = drawingStart.x + width;
+              shapeWidth = Math.abs(width);
+            }
+            if (height < 0) {
+              posY = drawingStart.y + height;
+              shapeHeight = Math.abs(height);
+            }
+          }
+        } else {
+          // User just clicked - create default-sized shape centered on click
+          if (isLine) {
+            // Line/arrow: horizontal line starting from click point
+            shapeWidth = defaultLineLength;
+            shapeHeight = 0;
+          } else {
+            // Rectangle/ellipse: centered on click
+            posX = drawingStart.x - defaultRectSize / 2;
+            posY = drawingStart.y - defaultRectSize / 2;
+            shapeWidth = defaultRectSize;
+            shapeHeight = defaultRectSize;
+          }
+        }
+
+        const annotation: ShapeAnnotation = {
+          id: `shape-${Date.now()}`,
+          page: drawingStart.pageIndex,
+          shapeType: activeShapeType,
+          position: { x: posX, y: posY },
+          width: shapeWidth,
+          height: shapeHeight,
+          fillColor: "transparent",
+          strokeColor: "black",
+          strokeWidth: 2,
+          opacity: 100,
+        };
+
+        onAddShapeAnnotation(annotation);
+        onSelectAnnotation(annotation.id);
+
+        setIsDrawingShape(false);
+        setDrawingStart(null);
+        setDrawingCurrent(null);
+      };
+
+      document.addEventListener("mousemove", handleMove);
+      document.addEventListener("mouseup", handleEnd);
+      document.addEventListener("touchmove", handleMove, { passive: false });
+      document.addEventListener("touchend", handleEnd);
+
+      return () => {
+        document.removeEventListener("mousemove", handleMove);
+        document.removeEventListener("mouseup", handleEnd);
+        document.removeEventListener("touchmove", handleMove);
+        document.removeEventListener("touchend", handleEnd);
+      };
+    }, [isDrawingShape, drawingStart, drawingCurrent, activeShapeType, getPageCoordinates, onAddShapeAnnotation, onSelectAnnotation]);
+
+    // Render shape preview while drawing
+    const renderDrawingPreview = useCallback(() => {
+      if (!isDrawingShape || !drawingStart || !drawingCurrent) return null;
+
+      const width = drawingCurrent.x - drawingStart.x;
+      const height = drawingCurrent.y - drawingStart.y;
+      const isLine = activeShapeType === "line" || activeShapeType === "arrow";
+
+      // For preview, position at the drawing start
+      let previewX = drawingStart.x;
+      let previewY = drawingStart.y;
+      let previewWidth = width;
+      let previewHeight = height;
+
+      if (!isLine) {
+        if (width < 0) {
+          previewX = drawingStart.x + width;
+          previewWidth = Math.abs(width);
+        }
+        if (height < 0) {
+          previewY = drawingStart.y + height;
+          previewHeight = Math.abs(height);
+        }
+      }
+
+      const strokeWidth = 2;
+      const svgWidth = (isLine ? Math.abs(width) + strokeWidth * 2 : previewWidth + strokeWidth) * scale;
+      const svgHeight = (isLine ? Math.abs(height) + strokeWidth * 2 : previewHeight + strokeWidth) * scale;
+
+      return (
+        <div
+          className="absolute pointer-events-none z-40"
+          style={{
+            left: (isLine ? Math.min(drawingStart.x, drawingCurrent.x) - strokeWidth : previewX - strokeWidth / 2) * scale,
+            top: (isLine ? Math.min(drawingStart.y, drawingCurrent.y) - strokeWidth : previewY - strokeWidth / 2) * scale,
+          }}
+        >
+          <svg
+            width={svgWidth}
+            height={svgHeight}
+            className="overflow-visible"
+            style={{ opacity: 0.7 }}
+          >
+            {activeShapeType === "rectangle" && (
+              <rect
+                x={(strokeWidth / 2) * scale}
+                y={(strokeWidth / 2) * scale}
+                width={previewWidth * scale}
+                height={previewHeight * scale}
+                fill="none"
+                stroke="#3366cc"
+                strokeWidth={strokeWidth * scale}
+                strokeDasharray={`${4 * scale} ${4 * scale}`}
+              />
+            )}
+            {activeShapeType === "ellipse" && (
+              <ellipse
+                cx={(previewWidth / 2 + strokeWidth / 2) * scale}
+                cy={(previewHeight / 2 + strokeWidth / 2) * scale}
+                rx={(previewWidth / 2) * scale}
+                ry={(previewHeight / 2) * scale}
+                fill="none"
+                stroke="#3366cc"
+                strokeWidth={strokeWidth * scale}
+                strokeDasharray={`${4 * scale} ${4 * scale}`}
+              />
+            )}
+            {activeShapeType === "triangle" && (
+              <polygon
+                points={`
+                  ${(previewWidth / 2 + strokeWidth / 2) * scale},${(strokeWidth / 2) * scale}
+                  ${(previewWidth + strokeWidth / 2) * scale},${(previewHeight + strokeWidth / 2) * scale}
+                  ${(strokeWidth / 2) * scale},${(previewHeight + strokeWidth / 2) * scale}
+                `}
+                fill="none"
+                stroke="#3366cc"
+                strokeWidth={strokeWidth * scale}
+                strokeDasharray={`${4 * scale} ${4 * scale}`}
+              />
+            )}
+            {activeShapeType === "hexagon" && (() => {
+              const cx = (previewWidth / 2 + strokeWidth / 2) * scale;
+              const cy = (previewHeight / 2 + strokeWidth / 2) * scale;
+              const rx = (previewWidth / 2) * scale;
+              const ry = (previewHeight / 2) * scale;
+              const points = Array.from({ length: 6 }, (_, i) => {
+                const angle = (i * 60 - 90) * (Math.PI / 180);
+                return `${cx + rx * Math.cos(angle)},${cy + ry * Math.sin(angle)}`;
+              }).join(" ");
+              return (
+                <polygon
+                  points={points}
+                  fill="none"
+                  stroke="#3366cc"
+                  strokeWidth={strokeWidth * scale}
+                  strokeDasharray={`${4 * scale} ${4 * scale}`}
+                />
+              );
+            })()}
+            {activeShapeType === "star" && (() => {
+              const cx = (previewWidth / 2 + strokeWidth / 2) * scale;
+              const cy = (previewHeight / 2 + strokeWidth / 2) * scale;
+              const outerRx = (previewWidth / 2) * scale;
+              const outerRy = (previewHeight / 2) * scale;
+              const innerRx = outerRx * 0.4;
+              const innerRy = outerRy * 0.4;
+              const points = Array.from({ length: 10 }, (_, i) => {
+                const angle = (i * 36 - 90) * (Math.PI / 180);
+                const isOuter = i % 2 === 0;
+                const rx = isOuter ? outerRx : innerRx;
+                const ry = isOuter ? outerRy : innerRy;
+                return `${cx + rx * Math.cos(angle)},${cy + ry * Math.sin(angle)}`;
+              }).join(" ");
+              return (
+                <polygon
+                  points={points}
+                  fill="none"
+                  stroke="#3366cc"
+                  strokeWidth={strokeWidth * scale}
+                  strokeDasharray={`${4 * scale} ${4 * scale}`}
+                />
+              );
+            })()}
+            {activeShapeType === "callout" && (() => {
+              const w = previewWidth * scale;
+              const h = previewHeight * scale;
+              const p = (strokeWidth / 2) * scale;
+              const r = Math.min(8 * scale, w / 4, h / 4);
+              const tailWidth = Math.min(20 * scale, w / 3);
+              const tailHeight = Math.min(15 * scale, h / 3);
+              const path = `
+                M ${p + r} ${p}
+                H ${p + w - r}
+                Q ${p + w} ${p} ${p + w} ${p + r}
+                V ${p + h - r}
+                Q ${p + w} ${p + h} ${p + w - r} ${p + h}
+                H ${p + tailWidth + 10 * scale}
+                L ${p} ${p + h + tailHeight}
+                L ${p + tailWidth} ${p + h}
+                H ${p + r}
+                Q ${p} ${p + h} ${p} ${p + h - r}
+                V ${p + r}
+                Q ${p} ${p} ${p + r} ${p}
+                Z
+              `;
+              return (
+                <path
+                  d={path}
+                  fill="none"
+                  stroke="#3366cc"
+                  strokeWidth={strokeWidth * scale}
+                  strokeDasharray={`${4 * scale} ${4 * scale}`}
+                />
+              );
+            })()}
+            {(activeShapeType === "line" || activeShapeType === "arrow") && (
+              <>
+                {activeShapeType === "arrow" && (
+                  <defs>
+                    <marker
+                      id="preview-arrowhead"
+                      markerWidth="10"
+                      markerHeight="7"
+                      refX="9"
+                      refY="3.5"
+                      orient="auto"
+                    >
+                      <polygon points="0 0, 10 3.5, 0 7" fill="#3366cc" />
+                    </marker>
+                  </defs>
+                )}
+                <line
+                  x1={(width >= 0 ? strokeWidth : Math.abs(width) + strokeWidth) * scale}
+                  y1={(height >= 0 ? strokeWidth : Math.abs(height) + strokeWidth) * scale}
+                  x2={(width >= 0 ? Math.abs(width) + strokeWidth : strokeWidth) * scale}
+                  y2={(height >= 0 ? Math.abs(height) + strokeWidth : strokeWidth) * scale}
+                  stroke="#3366cc"
+                  strokeWidth={strokeWidth * scale}
+                  strokeDasharray={`${4 * scale} ${4 * scale}`}
+                  markerEnd={activeShapeType === "arrow" ? "url(#preview-arrowhead)" : undefined}
+                />
+              </>
+            )}
+          </svg>
+        </div>
+      );
+    }, [isDrawingShape, drawingStart, drawingCurrent, activeShapeType, scale]);
+
     const handlePageClick = useCallback(
       (e: React.MouseEvent<HTMLDivElement>, pageIndex: number) => {
+        // Shape tool uses mousedown/mouseup, not click
+        if (activeTool === "shape") return;
+
         // Don't handle clicks on form fields
         const target = e.target as HTMLElement;
         if (
@@ -412,9 +830,11 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
                 data-page-number={pageIndex + 1}
                 className="relative"
                 style={{
-                  cursor: shouldRender && (activeTool === "text-insert" || activeTool === "signature") ? "crosshair" : "default",
+                  cursor: shouldRender && (activeTool === "text-insert" || activeTool === "signature" || activeTool === "shape") ? "crosshair" : "default",
                 }}
                 onClick={(e) => shouldRender && handlePageClick(e, pageIndex)}
+                onMouseDown={(e) => shouldRender && handlePageMouseDown(e, pageIndex)}
+                onTouchStart={(e) => shouldRender && handlePageTouchStart(e, pageIndex)}
               >
                 {shouldRender ? (
                   <>
@@ -501,6 +921,25 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
                         onRemove={() => onRemoveRedaction(annotation.id)}
                       />
                     ))}
+
+                    {/* Shape annotations for this page */}
+                    {pageAnnotations?.shape.map((annotation) => (
+                      <ShapeAnnotationOverlay
+                        key={annotation.id}
+                        annotation={annotation}
+                        scale={scale}
+                        cssScale={cssScale}
+                        isSelected={selectedAnnotationId === annotation.id}
+                        onSelect={() => onSelectAnnotation(annotation.id)}
+                        onUpdate={(updates) =>
+                          onUpdateShapeAnnotation(annotation.id, updates)
+                        }
+                        onRemove={() => onRemoveShapeAnnotation(annotation.id)}
+                      />
+                    ))}
+
+                    {/* Shape drawing preview */}
+                    {isDrawingShape && drawingStart?.pageIndex === pageIndex && renderDrawingPreview()}
                   </>
                 ) : (
                   <PageSkeleton

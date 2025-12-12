@@ -1,10 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
-import { ArrowRight, FileText, Upload, Download, MousePointer, Check } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowRight, FileText, Upload, Download, MousePointer, Plus, Minus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import type { LucideIcon } from "lucide-react";
-import { useRef } from "react";
 
 export interface HowToStep {
   title: string;
@@ -157,45 +158,122 @@ function StepIllustration({ stepIndex, title }: { stepIndex: number; title: stri
   );
 }
 
+// FAQ Item component with accordion
+function FaqItem({
+  question,
+  answer,
+  isOpen,
+  onToggle,
+  index,
+}: {
+  question: string;
+  answer: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  index: number;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-50px" }}
+      transition={{ delay: index * 0.08, duration: 0.5 }}
+    >
+      <button
+        onClick={onToggle}
+        className="w-full text-left group"
+        aria-expanded={isOpen}
+      >
+        <div
+          className={`
+            flex items-start justify-between gap-4 py-6
+            border-b border-border transition-colors
+            ${isOpen ? "border-transparent" : ""}
+          `}
+        >
+          <h3 className="text-foreground font-medium text-lg pr-4 group-hover:text-primary transition-colors">
+            {question}
+          </h3>
+          <div
+            className={`
+              flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center
+              transition-all duration-300
+              ${isOpen ? "bg-primary text-primary-foreground rotate-0" : "bg-muted text-muted-foreground"}
+            `}
+          >
+            {isOpen ? (
+              <Minus className="w-4 h-4" />
+            ) : (
+              <Plus className="w-4 h-4" />
+            )}
+          </div>
+        </div>
+      </button>
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            className="overflow-hidden"
+          >
+            <p className="text-muted-foreground leading-relaxed pb-6 pr-12">
+              {answer}
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
 export function SEOContent({
   toolName,
   howToSteps,
   faqs,
   relatedTools,
 }: SEOContentProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
+
+  const handleFaqToggle = (index: number) => {
+    setOpenFaqIndex(openFaqIndex === index ? null : index);
+  };
 
   return (
-    <div ref={containerRef} className="relative w-full overflow-hidden bg-background">
-      {/* Subtle gradient overlay - fixed position */}
-      <div
-        className="absolute inset-0 opacity-60"
-      >
-        <div
-          className="absolute inset-0"
-          style={{
-            background: `
-              radial-gradient(ellipse 80% 50% at 50% 20%, rgba(120, 119, 198, 0.12), transparent),
-              radial-gradient(ellipse 60% 40% at 80% 50%, rgba(255, 200, 150, 0.06), transparent),
-              radial-gradient(ellipse 50% 30% at 20% 80%, rgba(100, 180, 255, 0.05), transparent)
-            `,
-          }}
-        />
-      </div>
+    <div className="relative w-full overflow-hidden bg-background">
+      <div className="w-full max-w-7xl mx-auto px-6 lg:px-12 py-24 lg:py-32">
 
-      {/* Noise texture overlay */}
-      <div
-        className="absolute inset-0 opacity-[0.02] pointer-events-none"
-        style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
-          backgroundSize: '128px 128px',
-        }}
-      />
-
-      <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-12 py-24 lg:py-32">
+        {/* Metrics Section - Direct on page, no cards */}
+        <section className="mb-16 sm:mb-32">
+          <div className="flex justify-center gap-8 sm:gap-16">
+            {[
+              { label: "Processing", value: "Instant", subtext: "In your browser" },
+              { label: "Privacy", value: "100%", subtext: "Files never uploaded" },
+              { label: "Cost", value: "Free", subtext: "No limits" },
+            ].map((stat, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1, duration: 0.5 }}
+                className="text-center"
+              >
+                <p
+                  className="text-2xl sm:text-4xl lg:text-5xl font-medium text-foreground mb-0.5 sm:mb-1"
+                  style={{ fontFamily: "'Fraunces', serif" }}
+                >
+                  {stat.value}
+                </p>
+                <p className="text-xs sm:text-sm text-muted-foreground">{stat.subtext}</p>
+              </motion.div>
+            ))}
+          </div>
+        </section>
 
         {/* How-To Section */}
-        <section className="mb-32">
+        <section className="mb-24">
           {/* Section header */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -204,21 +282,13 @@ export function SEOContent({
             transition={{ duration: 0.6 }}
             className="text-center mb-16 lg:mb-20"
           >
-            <motion.span
-              initial={{ opacity: 0, scale: 0.9 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.1, duration: 0.4 }}
-              className="inline-block px-4 py-1.5 text-[11px] font-medium tracking-[0.2em] uppercase text-muted-foreground border border-border rounded-full mb-6"
-            >
-              How it works
-            </motion.span>
             <h2
-              className="text-4xl sm:text-5xl lg:text-6xl font-medium text-foreground mb-5 tracking-tight"
+              className="text-3xl sm:text-4xl lg:text-5xl font-medium text-foreground mb-5 tracking-tight"
               style={{ fontFamily: "'Fraunces', serif" }}
             >
               How to {toolName}
             </h2>
-            <p className="text-lg text-muted-foreground max-w-xl mx-auto font-light">
+            <p className="text-lg text-muted-foreground max-w-xl mx-auto">
               Three simple steps. No account needed.
             </p>
           </motion.div>
@@ -278,134 +348,77 @@ export function SEOContent({
           </div>
         </section>
 
-        {/* Features bar */}
-        <motion.section
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.8 }}
-          className="mb-32"
-        >
-          <div className="relative py-10 px-8 rounded-2xl border border-border bg-gradient-to-r from-muted/30 via-muted/50 to-muted/30">
-            <div className="grid sm:grid-cols-3 gap-8 sm:gap-0 sm:divide-x divide-border">
-              {[
-                { label: "Processing", value: "Instant", subtext: "In your browser" },
-                { label: "Privacy", value: "100%", subtext: "Files never uploaded" },
-                { label: "Cost", value: "Free", subtext: "No limits" },
-              ].map((stat, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: i * 0.1, duration: 0.5 }}
-                  className="text-center px-6"
-                >
-                  <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground/70 mb-2">{stat.label}</p>
-                  <p
-                    className="text-3xl lg:text-4xl font-medium text-foreground mb-1"
-                    style={{ fontFamily: "'Fraunces', serif" }}
-                  >
-                    {stat.value}
-                  </p>
-                  <p className="text-sm text-muted-foreground">{stat.subtext}</p>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-        </motion.section>
-
-        {/* FAQ Section */}
-        <section className="mb-32">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="text-center mb-14"
-          >
-            <h2
-              className="text-3xl sm:text-4xl font-medium text-foreground mb-4 tracking-tight"
-              style={{ fontFamily: "'Fraunces', serif" }}
-            >
-              Common Questions
-            </h2>
-            <p className="text-muted-foreground max-w-lg mx-auto">
-              Everything you need to know
-            </p>
-          </motion.div>
-
-          <div className="max-w-3xl mx-auto space-y-4">
-            {faqs.map((faq, index) => (
+        {/* FAQ Section - Homepage style with two columns */}
+        <section className="mb-16">
+          <div className="max-w-4xl mx-auto">
+            <div className="grid lg:grid-cols-[1fr,1.5fr] gap-12 lg:gap-16">
+              {/* Left side - heading */}
               <motion.div
-                key={index}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-50px" }}
-                transition={{ delay: index * 0.08, duration: 0.5 }}
-                className="group"
+                viewport={{ once: true, margin: "-100px" }}
+                transition={{ duration: 0.5 }}
+                className="lg:self-start"
               >
-                <div className="relative py-6 px-6 rounded-xl bg-muted/30 border border-border hover:bg-muted/50 hover:border-border transition-all duration-300">
-                  <div className="flex gap-4">
-                    <div className="flex-shrink-0 w-6 h-6 rounded-full bg-muted flex items-center justify-center mt-0.5 group-hover:bg-muted transition-colors">
-                      <Check className="w-3.5 h-3.5 text-muted-foreground" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-foreground font-medium mb-2 pr-4">{faq.question}</h3>
-                      <p className="text-muted-foreground text-sm leading-relaxed">{faq.answer}</p>
-                    </div>
-                  </div>
-                </div>
+                <h2
+                  className="text-3xl sm:text-4xl font-medium text-foreground mb-4"
+                  style={{ fontFamily: "'Fraunces', serif" }}
+                >
+                  Questions?
+                  <br />
+                  We&apos;ve got answers.
+                </h2>
+                <p className="text-muted-foreground">
+                  Everything you need to know about this tool.
+                </p>
               </motion.div>
-            ))}
+
+              {/* Right side - accordion */}
+              <div>
+                {faqs.map((faq, index) => (
+                  <FaqItem
+                    key={index}
+                    question={faq.question}
+                    answer={faq.answer}
+                    isOpen={openFaqIndex === index}
+                    onToggle={() => handleFaqToggle(index)}
+                    index={index}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
         </section>
 
-        {/* Related Tools Section */}
-        {relatedTools && relatedTools.length > 0 && (
-          <motion.section
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8 }}
-          >
-            <div className="text-center mb-10">
-              <h2
-                className="text-2xl font-medium text-foreground mb-2"
-                style={{ fontFamily: "'Fraunces', serif" }}
-              >
-                More PDF Tools
-              </h2>
-              <p className="text-muted-foreground text-sm">Continue working with your documents</p>
-            </div>
-
-            <div className="grid sm:grid-cols-3 gap-4">
-              {relatedTools.map((tool, i) => (
-                <motion.div
-                  key={tool.href}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: i * 0.1, duration: 0.5 }}
-                >
-                  <Link
-                    href={tool.href}
-                    className="group flex items-center justify-between p-5 rounded-xl bg-muted/30 border border-border hover:bg-muted/50 hover:border-border transition-all duration-300"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center group-hover:bg-muted transition-colors">
-                        <tool.icon className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
-                      </div>
-                      <span className="text-foreground font-medium">{tool.name}</span>
-                    </div>
-                    <ArrowRight className="w-4 h-4 text-muted-foreground/50 group-hover:text-muted-foreground group-hover:translate-x-1 transition-all duration-300" />
-                  </Link>
-                </motion.div>
-              ))}
-            </div>
-          </motion.section>
-        )}
       </div>
+
+      {/* Final CTA Section - like homepage */}
+      <section className="py-24 px-6 lg:px-12 bg-muted/30">
+        <div className="max-w-3xl mx-auto text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.5 }}
+          >
+            <h2
+              className="text-3xl sm:text-4xl lg:text-5xl font-medium text-foreground mb-6"
+              style={{ fontFamily: "'Fraunces', serif" }}
+            >
+              Start Editing PDFs for Free
+            </h2>
+            <p className="text-lg text-muted-foreground mb-10 max-w-xl mx-auto text-balance">
+              No account needed. No software to install. Your files stay private on your device.
+            </p>
+            <Button asChild size="lg" className="!px-10 !py-6 text-base rounded-full">
+              <Link href="/editor" className="flex items-center gap-2">
+                Get Started
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </Button>
+          </motion.div>
+        </div>
+      </section>
     </div>
   );
 }

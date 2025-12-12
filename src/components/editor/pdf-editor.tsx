@@ -12,6 +12,7 @@ import { extractFormValues } from "@/lib/pdf/form-extractor";
 import type { HighlightColor, StrikethroughColor } from "@/lib/pdf/types";
 import { PDFViewer, type PDFViewerHandle } from "./pdf-viewer";
 import { Toolbar } from "./toolbar";
+import { MobileToolbar } from "./mobile-toolbar";
 import { SelectionToolbar } from "./selection-toolbar";
 import { ScrollProgress } from "./scroll-progress";
 import { CompressPdfWindow } from "@/components/micro-apps/windows/compress-pdf-window";
@@ -72,7 +73,11 @@ export function PDFEditor({
     removeStrikethrough,
     addRedaction,
     removeRedaction,
+    addShapeAnnotation,
+    updateShapeAnnotation,
+    removeShapeAnnotation,
     setActiveTool,
+    setActiveShapeType,
     selectAnnotation,
     copySelectedAnnotation,
     pasteAnnotation,
@@ -192,12 +197,16 @@ export function PDFEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.pdfFile]);
 
-  // Sync state changes to parent for multi-document support
+  // Sync state changes to parent for multi-document support (debounced to prevent excessive updates)
   useEffect(() => {
-    if (onStateChange && state.pdfFile) {
+    if (!onStateChange || !state.pdfFile) return;
+
+    const timer = setTimeout(() => {
       onStateChange(getSnapshot(), isDirty);
-    }
-  }, [onStateChange, getSnapshot, isDirty, state.pdfFile, state.scale, state.textAnnotations, state.signatureAnnotations, state.highlightAnnotations, state.strikethroughAnnotations, state.redactionAnnotations, state.selectedAnnotationId, state.activeTool, state.clipboard]);
+    }, 100); // Debounce by 100ms
+
+    return () => clearTimeout(timer);
+  }, [onStateChange, getSnapshot, isDirty, state.pdfFile, state.scale, state.textAnnotations, state.signatureAnnotations, state.highlightAnnotations, state.strikethroughAnnotations, state.redactionAnnotations, state.shapeAnnotations, state.selectedAnnotationId, state.activeTool, state.activeShapeType, state.clipboard]);
 
   // Get current visible page index (first page that's at least partially visible)
   const getCurrentPageIndex = useCallback(() => {
@@ -486,6 +495,7 @@ export function PDFEditor({
         state.highlightAnnotations,
         state.strikethroughAnnotations,
         state.redactionAnnotations,
+        state.shapeAnnotations,
         options.rasterize ? { rasterize: true } : undefined
       );
 
@@ -514,7 +524,7 @@ export function PDFEditor({
         URL.revokeObjectURL(url);
       }
     }
-  }, [state.pdfBytes, state.textAnnotations, state.signatureAnnotations, state.highlightAnnotations, state.strikethroughAnnotations, state.redactionAnnotations, file.name]);
+  }, [state.pdfBytes, state.textAnnotations, state.signatureAnnotations, state.highlightAnnotations, state.strikethroughAnnotations, state.redactionAnnotations, state.shapeAnnotations, file.name]);
 
   // Check if there are any enabled redactions
   const hasRedactions = state.redactionAnnotations.some(r => r.enabled);
@@ -539,6 +549,7 @@ export function PDFEditor({
       <Toolbar
         scale={effectiveScale}
         activeTool={state.activeTool}
+        activeShapeType={state.activeShapeType}
         fileName={file.name}
         isSignaturePopoverOpen={isSignaturePopoverOpen}
         canUndo={canUndo}
@@ -551,6 +562,28 @@ export function PDFEditor({
         onZoomIn={zoomIn}
         onZoomOut={zoomOut}
         onToolChange={setActiveTool}
+        onShapeTypeChange={setActiveShapeType}
+        onSignaturePopoverChange={setIsSignaturePopoverOpen}
+        onSignatureCreated={handleSignatureCreated}
+        onDownload={handleDownload}
+        onMicroAppSelect={handleMicroAppSelect}
+      />
+      <MobileToolbar
+        scale={effectiveScale}
+        activeTool={state.activeTool}
+        activeShapeType={state.activeShapeType}
+        fileName={file.name}
+        isSignaturePopoverOpen={isSignaturePopoverOpen}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        hasRedactions={hasRedactions}
+        hidden={!!activeMicroApp}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+        onZoomIn={zoomIn}
+        onZoomOut={zoomOut}
+        onToolChange={setActiveTool}
+        onShapeTypeChange={setActiveShapeType}
         onSignaturePopoverChange={setIsSignaturePopoverOpen}
         onSignatureCreated={handleSignatureCreated}
         onDownload={handleDownload}
@@ -558,7 +591,7 @@ export function PDFEditor({
       />
 
       <motion.div
-        className="px-4 pt-4 pb-8"
+        className="px-4 pt-4 pb-8 md:pb-8 pb-24"
         initial={
           isEntering && entryRect
             ? { opacity: 0, scale: 0.95 }
@@ -587,7 +620,9 @@ export function PDFEditor({
           highlightAnnotations={state.highlightAnnotations}
           strikethroughAnnotations={state.strikethroughAnnotations}
           redactionAnnotations={state.redactionAnnotations}
+          shapeAnnotations={state.shapeAnnotations}
           activeTool={state.activeTool}
+          activeShapeType={state.activeShapeType}
           selectedAnnotationId={state.selectedAnnotationId}
           pendingSignatureData={pendingSignatureData}
           onAddTextAnnotation={addTextAnnotation}
@@ -599,6 +634,9 @@ export function PDFEditor({
           onRemoveHighlight={removeHighlight}
           onRemoveStrikethrough={removeStrikethrough}
           onRemoveRedaction={removeRedaction}
+          onAddShapeAnnotation={addShapeAnnotation}
+          onUpdateShapeAnnotation={updateShapeAnnotation}
+          onRemoveShapeAnnotation={removeShapeAnnotation}
           onToolChange={setActiveTool}
           onSelectAnnotation={selectAnnotation}
           onSignaturePlaced={handleSignaturePlaced}

@@ -97,7 +97,7 @@ export function SelectionToolbar({
         onMouseDown={preventSelectionLoss}
         onClick={preventSelectionLoss}
       >
-        <div className="flex items-center gap-0.5 px-2 py-1 bg-popover rounded-full shadow-lg border border-border">
+        <div className="flex items-center gap-0.5 md:gap-0.5 gap-1 px-2 md:px-2 px-3 py-1 md:py-1 py-2 bg-popover rounded-full shadow-lg border border-border">
           {/* Highlight button with color picker */}
           <div className="relative">
             <Tooltip>
@@ -105,7 +105,7 @@ export function SelectionToolbar({
                 <button
                   type="button"
                   className={cn(
-                    "flex items-center gap-1 px-2 py-1.5 rounded-full transition-colors",
+                    "flex items-center gap-1 px-2 md:px-2 px-3 py-1.5 md:py-1.5 py-2.5 rounded-full transition-colors",
                     "text-muted-foreground hover:text-foreground hover:bg-accent",
                     showHighlightPicker && "bg-accent text-foreground"
                   )}
@@ -116,8 +116,8 @@ export function SelectionToolbar({
                     setShowStrikethroughPicker(false);
                   }}
                 >
-                  <Highlighter className="w-4 h-4" />
-                  <ChevronDown className="w-3 h-3" />
+                  <Highlighter className="w-4 h-4 md:w-4 md:h-4 w-5 h-5" />
+                  <ChevronDown className="w-3 h-3 md:w-3 md:h-3 w-4 h-4" />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="top">Highlight</TooltipContent>
@@ -126,7 +126,7 @@ export function SelectionToolbar({
             {/* Highlight color picker dropdown */}
             {showHighlightPicker && (
               <div
-                className="absolute top-full left-0 mt-1 p-1.5 bg-popover rounded-full shadow-lg border border-border flex gap-1"
+                className="absolute top-full left-0 mt-1 p-1.5 md:p-1.5 p-2 bg-popover rounded-full shadow-lg border border-border flex gap-1 md:gap-1 gap-2"
                 onMouseDown={preventSelectionLoss}
                 onClick={preventSelectionLoss}
               >
@@ -135,7 +135,7 @@ export function SelectionToolbar({
                     key={color}
                     type="button"
                     className={cn(
-                      "w-6 h-6 rounded-full transition-transform hover:scale-110",
+                      "w-6 h-6 md:w-6 md:h-6 w-9 h-9 rounded-full transition-transform hover:scale-110 active:scale-95",
                       bg
                     )}
                     onMouseDown={preventSelectionLoss}
@@ -152,7 +152,7 @@ export function SelectionToolbar({
           </div>
 
           {/* Divider */}
-          <div className="w-px h-5 bg-border mx-0.5" />
+          <div className="w-px h-5 md:h-5 h-7 bg-border mx-0.5 md:mx-0.5 mx-1" />
 
           {/* Strikethrough button with color picker */}
           <div className="relative">
@@ -161,7 +161,7 @@ export function SelectionToolbar({
                 <button
                   type="button"
                   className={cn(
-                    "flex items-center gap-1 px-2 py-1.5 rounded-full transition-colors",
+                    "flex items-center gap-1 px-2 md:px-2 px-3 py-1.5 md:py-1.5 py-2.5 rounded-full transition-colors",
                     "text-muted-foreground hover:text-destructive hover:bg-destructive/10",
                     showStrikethroughPicker && "bg-destructive/10 text-destructive"
                   )}
@@ -172,8 +172,8 @@ export function SelectionToolbar({
                     setShowHighlightPicker(false);
                   }}
                 >
-                  <Strikethrough className="w-4 h-4" />
-                  <ChevronDown className="w-3 h-3" />
+                  <Strikethrough className="w-4 h-4 md:w-4 md:h-4 w-5 h-5" />
+                  <ChevronDown className="w-3 h-3 md:w-3 md:h-3 w-4 h-4" />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="top">Strikethrough</TooltipContent>
@@ -182,7 +182,7 @@ export function SelectionToolbar({
             {/* Strikethrough color picker dropdown */}
             {showStrikethroughPicker && (
               <div
-                className="absolute top-full right-0 mt-1 p-1.5 bg-popover rounded-full shadow-lg border border-border flex gap-1"
+                className="absolute top-full right-0 mt-1 p-1.5 md:p-1.5 p-2 bg-popover rounded-full shadow-lg border border-border flex gap-1 md:gap-1 gap-2"
                 onMouseDown={preventSelectionLoss}
                 onClick={preventSelectionLoss}
               >
@@ -191,7 +191,7 @@ export function SelectionToolbar({
                     key={color}
                     type="button"
                     className={cn(
-                      "w-6 h-6 rounded-full transition-transform hover:scale-110",
+                      "w-6 h-6 md:w-6 md:h-6 w-9 h-9 rounded-full transition-transform hover:scale-110 active:scale-95",
                       bg
                     )}
                     onMouseDown={preventSelectionLoss}
@@ -208,7 +208,7 @@ export function SelectionToolbar({
           </div>
 
           {/* Divider */}
-          <div className="w-px h-5 bg-border mx-0.5" />
+          <div className="w-px h-5 md:h-5 h-7 bg-border mx-0.5 md:mx-0.5 mx-1" />
 
           {/* Redact button */}
           <Tooltip>
@@ -216,7 +216,7 @@ export function SelectionToolbar({
               <button
                 type="button"
                 className={cn(
-                  "flex items-center gap-1 px-2 py-1.5 rounded-full transition-colors",
+                  "flex items-center gap-1 px-2 md:px-2 px-3 py-1.5 md:py-1.5 py-2.5 rounded-full transition-colors",
                   "text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                 )}
                 onMouseDown={preventSelectionLoss}
@@ -226,7 +226,7 @@ export function SelectionToolbar({
                   closeDropdowns();
                 }}
               >
-                <EyeOff className="w-4 h-4" />
+                <EyeOff className="w-4 h-4 md:w-4 md:h-4 w-5 h-5" />
               </button>
             </TooltipTrigger>
             <TooltipContent side="top">Redact</TooltipContent>

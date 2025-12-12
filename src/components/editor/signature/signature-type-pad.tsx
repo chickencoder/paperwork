@@ -63,12 +63,9 @@ export function SignatureTypePad({ onSignatureChange }: SignatureTypePadProps) {
     canvas.height = (textHeight + padding * 2) * dpr;
     ctx.scale(dpr, dpr);
 
-    // Draw text - use foreground color from CSS or fallback
+    // Draw text in black (color can be changed after placing)
     ctx.font = `${fontSize}px ${font.family}`;
-    ctx.fillStyle =
-      getComputedStyle(document.documentElement)
-        .getPropertyValue("--foreground")
-        .trim() || "#0a0a0a";
+    ctx.fillStyle = "#1a1a1a";
     ctx.textBaseline = "middle";
     ctx.fillText(name, padding, (textHeight + padding * 2) / 2);
 
