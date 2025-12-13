@@ -1,0 +1,13 @@
+{
+  "extends": "@paperwork/tsconfig/react-library.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@paperwork/ui": ["../ui/src"],
+      "@paperwork/pdf-lib": ["../pdf-lib/src"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

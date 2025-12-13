@@ -15,6 +15,12 @@ dist
 .next/
 out/
 
+# Turbo
+.turbo
+
+# Build outputs
+*.tsbuildinfo
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
