@@ -242,35 +242,7 @@ export function SEOContent({
 
   return (
     <div className="relative w-full overflow-hidden bg-background">
-      <div className="w-full max-w-7xl mx-auto px-6 lg:px-12 py-24 lg:py-32">
-
-        {/* Metrics Section - Direct on page, no cards */}
-        <section className="mb-16 sm:mb-32">
-          <div className="flex justify-center gap-8 sm:gap-16">
-            {[
-              { label: "Processing", value: "Instant", subtext: "In your browser" },
-              { label: "Privacy", value: "100%", subtext: "Files never uploaded" },
-              { label: "Cost", value: "Free", subtext: "No limits" },
-            ].map((stat, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.1, duration: 0.5 }}
-                className="text-center"
-              >
-                <p
-                  className="text-2xl sm:text-4xl lg:text-5xl font-medium text-foreground mb-0.5 sm:mb-1"
-                  style={{ fontFamily: "'Fraunces', serif" }}
-                >
-                  {stat.value}
-                </p>
-                <p className="text-xs sm:text-sm text-muted-foreground">{stat.subtext}</p>
-              </motion.div>
-            ))}
-          </div>
-        </section>
+      <div className="w-full max-w-6xl mx-auto px-6 py-24 lg:py-32">
 
         {/* How-To Section */}
         <section className="mb-24">
@@ -348,44 +320,40 @@ export function SEOContent({
           </div>
         </section>
 
-        {/* FAQ Section - Homepage style with two columns */}
+        {/* FAQ Section */}
         <section className="mb-16">
-          <div className="max-w-4xl mx-auto">
-            <div className="grid lg:grid-cols-[1fr,1.5fr] gap-12 lg:gap-16">
-              {/* Left side - heading */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-100px" }}
-                transition={{ duration: 0.5 }}
-                className="lg:self-start"
+          <div className="max-w-3xl mx-auto">
+            {/* Centered heading */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-100px" }}
+              transition={{ duration: 0.5 }}
+              className="text-center mb-12"
+            >
+              <h2
+                className="text-3xl sm:text-4xl font-medium text-foreground mb-4"
+                style={{ fontFamily: "'Fraunces', serif" }}
               >
-                <h2
-                  className="text-3xl sm:text-4xl font-medium text-foreground mb-4"
-                  style={{ fontFamily: "'Fraunces', serif" }}
-                >
-                  Questions?
-                  <br />
-                  We&apos;ve got answers.
-                </h2>
-                <p className="text-muted-foreground">
-                  Everything you need to know about this tool.
-                </p>
-              </motion.div>
+                Frequently Asked Questions
+              </h2>
+              <p className="text-muted-foreground">
+                Everything you need to know about this tool.
+              </p>
+            </motion.div>
 
-              {/* Right side - accordion */}
-              <div>
-                {faqs.map((faq, index) => (
-                  <FaqItem
-                    key={index}
-                    question={faq.question}
-                    answer={faq.answer}
-                    isOpen={openFaqIndex === index}
-                    onToggle={() => handleFaqToggle(index)}
-                    index={index}
-                  />
-                ))}
-              </div>
+            {/* Accordion */}
+            <div>
+              {faqs.map((faq, index) => (
+                <FaqItem
+                  key={index}
+                  question={faq.question}
+                  answer={faq.answer}
+                  isOpen={openFaqIndex === index}
+                  onToggle={() => handleFaqToggle(index)}
+                  index={index}
+                />
+              ))}
             </div>
           </div>
         </section>

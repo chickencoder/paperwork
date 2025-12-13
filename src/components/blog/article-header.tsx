@@ -1,8 +1,7 @@
 import Image from "next/image";
 import type { ArticleFrontmatter } from "@/lib/blog/types";
-import { TagBadge } from "./tag-badge";
 
-interface ArticleHeaderProps extends ArticleFrontmatter {
+interface ArticleHeaderProps extends Omit<ArticleFrontmatter, "tags"> {
   readingTime: number;
 }
 
@@ -11,7 +10,6 @@ export function ArticleHeader({
   description,
   publishedAt,
   author,
-  tags,
   readingTime,
 }: ArticleHeaderProps) {
   const formattedDate = new Date(publishedAt).toLocaleDateString("en-US", {
@@ -22,13 +20,6 @@ export function ArticleHeader({
 
   return (
     <header className="mb-10">
-      {/* Tags */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        {tags.map((tag) => (
-          <TagBadge key={tag} tag={tag} href={`/blog?tag=${tag}`} />
-        ))}
-      </div>
-
       {/* Title */}
       <h1
         className="text-3xl sm:text-4xl lg:text-5xl font-medium text-foreground mb-4 tracking-tight"
@@ -43,7 +34,7 @@ export function ArticleHeader({
       </p>
 
       {/* Meta */}
-      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+      <div className="flex items-center gap-3 text-sm text-muted-foreground">
         {author && (
           <div className="flex items-center gap-2">
             {author.avatar && (
@@ -58,9 +49,9 @@ export function ArticleHeader({
             <span className="font-medium text-foreground">{author.name}</span>
           </div>
         )}
-        <span>·</span>
+        <span className="text-muted-foreground/50">/</span>
         <time dateTime={publishedAt}>{formattedDate}</time>
-        <span>·</span>
+        <span className="text-muted-foreground/50">/</span>
         <span>{readingTime} min read</span>
       </div>
     </header>

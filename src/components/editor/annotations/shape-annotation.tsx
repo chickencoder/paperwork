@@ -784,7 +784,7 @@ export const ShapeAnnotationOverlay = memo(function ShapeAnnotationOverlay({
                   setShowStrokeColorPicker(false);
                 }}
                 className={cn(
-                  "w-6 h-6 rounded border-2 border-border hover:border-ring transition-colors",
+                  "w-6 h-6 rounded-full border-2 border-border hover:border-ring transition-colors",
                   annotation.fillColor === "transparent" && "bg-[repeating-linear-gradient(45deg,#ccc,#ccc_2px,transparent_2px,transparent_4px)]"
                 )}
                 style={{
@@ -793,7 +793,7 @@ export const ShapeAnnotationOverlay = memo(function ShapeAnnotationOverlay({
                 title="Fill color"
               />
               {showFillColorPicker && (
-                <div className="absolute top-full left-0 mt-1 p-3 bg-popover rounded-xl shadow-lg border border-border z-[60]">
+                <div className="absolute top-full left-0 mt-1 p-3 bg-popover rounded-2xl shadow-lg border border-border z-[60]">
                   <div className="grid grid-cols-5 gap-2" style={{ width: 130 }}>
                     {SHAPE_COLOR_OPTIONS.map((option) => (
                       <button
@@ -831,7 +831,7 @@ export const ShapeAnnotationOverlay = memo(function ShapeAnnotationOverlay({
                 setShowFillColorPicker(false);
               }}
               className={cn(
-                "w-6 h-6 rounded border-2 hover:border-ring transition-colors",
+                "w-6 h-6 rounded-full border-2 hover:border-ring transition-colors",
                 annotation.strokeColor === "transparent" && "bg-[repeating-linear-gradient(45deg,#ccc,#ccc_2px,transparent_2px,transparent_4px)]"
               )}
               style={{
@@ -841,7 +841,7 @@ export const ShapeAnnotationOverlay = memo(function ShapeAnnotationOverlay({
               title="Stroke color"
             />
             {showStrokeColorPicker && (
-              <div className="absolute top-full left-0 mt-1 p-3 bg-popover rounded-xl shadow-lg border border-border z-[60]">
+              <div className="absolute top-full left-0 mt-1 p-3 bg-popover rounded-2xl shadow-lg border border-border z-[60]">
                 <div className="grid grid-cols-5 gap-2" style={{ width: 130 }}>
                   {SHAPE_COLOR_OPTIONS.map((option) => (
                     <button

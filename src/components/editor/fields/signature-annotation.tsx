@@ -460,7 +460,7 @@ export const SignatureAnnotationOverlay = memo(function SignatureAnnotationOverl
               <div
                 className={cn(
                   "absolute top-full left-0 mt-1 p-3",
-                  "bg-popover rounded-xl shadow-lg border border-border",
+                  "bg-popover rounded-2xl shadow-lg border border-border",
                   "z-[60]"
                 )}
                 onMouseDown={(e) => e.stopPropagation()}

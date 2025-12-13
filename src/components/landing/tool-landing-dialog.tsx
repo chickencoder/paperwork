@@ -190,7 +190,7 @@ export function ToolLandingDialog({
 
           {/* Main content - Two column hero */}
           <div className="flex items-center">
-            <div className="w-full max-w-7xl mx-auto px-6 lg:px-12 pt-24 sm:pt-32 pb-8 sm:pb-12">
+            <div className="w-full max-w-6xl mx-auto px-6 pt-24 sm:pt-32 pb-8 sm:pb-12">
               <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
 
                 {/* Left column - Content */}

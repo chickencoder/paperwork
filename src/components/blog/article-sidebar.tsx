@@ -4,22 +4,20 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TableOfContents } from "./table-of-contents";
-import type { TableOfContentsItem } from "@/lib/blog/types";
+import { TagBadge } from "./tag-badge";
 
 interface ArticleSidebarProps {
-  headings: TableOfContentsItem[];
+  tags?: string[];
 }
 
-export function ArticleSidebar({ headings }: ArticleSidebarProps) {
+export function ArticleSidebar({ tags }: ArticleSidebarProps) {
   return (
     <aside className="hidden lg:block">
       <div className="sticky top-24 space-y-8">
         {/* Table of Contents */}
-        {headings.length > 0 && (
-          <div className="pb-6 border-b border-border">
-            <TableOfContents headings={headings} />
-          </div>
-        )}
+        <div className="pb-6 border-b border-border">
+          <TableOfContents />
+        </div>
 
         {/* CTA Card */}
         <div className="bg-muted/50 rounded-xl p-6 border border-border">
@@ -39,6 +37,18 @@ export function ArticleSidebar({ headings }: ArticleSidebarProps) {
             </Link>
           </Button>
         </div>
+
+        {/* Tags */}
+        {tags && tags.length > 0 && (
+          <div>
+            <p className="text-sm font-medium text-foreground mb-3">Tags</p>
+            <div className="flex flex-wrap gap-2">
+              {tags.map((tag) => (
+                <TagBadge key={tag} tag={tag} href={`/blog?tag=${tag}`} />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </aside>
   );

@@ -3,7 +3,6 @@ import type { Metadata } from "next";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import remarkGfm from "remark-gfm";
 import rehypeSlug from "rehype-slug";
-import rehypeAutolinkHeadings from "rehype-autolink-headings";
 import { getAllArticles, getArticleBySlug } from "@/lib/blog/mdx";
 import {
   ArticleHeader,
@@ -72,35 +71,33 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   }
 
   return (
-    <article className="pt-24 sm:pt-32 pb-16 sm:pb-24 px-6 lg:px-12">
+    <article className="pt-16 pb-16 sm:pb-24 px-6 lg:px-12">
+      {/* Hero Image - full width */}
       <div className="max-w-7xl mx-auto">
-        {/* Hero Image */}
         <ArticleHeroImage heroImage={article.heroImage} />
+      </div>
 
-        <div className="grid lg:grid-cols-[1fr_280px] gap-12">
+      {/* Content - narrower width */}
+      <div className="max-w-6xl mx-auto">
+        <div className="grid lg:grid-cols-[1fr_280px] gap-16">
           {/* Main content */}
           <div className="min-w-0">
             <ArticleHeader {...article} />
 
-            <div className="prose prose-lg dark:prose-invert max-w-none">
-              <MDXRemote
-                source={article.content}
-                components={mdxComponents}
-                options={{
-                  mdxOptions: {
-                    remarkPlugins: [remarkGfm],
-                    rehypePlugins: [
-                      rehypeSlug,
-                      [rehypeAutolinkHeadings, { behavior: "wrap" }],
-                    ],
-                  },
-                }}
-              />
-            </div>
+            <MDXRemote
+              source={article.content}
+              components={mdxComponents}
+              options={{
+                mdxOptions: {
+                  remarkPlugins: [remarkGfm],
+                  rehypePlugins: [rehypeSlug],
+                },
+              }}
+            />
           </div>
 
           {/* Sidebar */}
-          <ArticleSidebar headings={article.headings} />
+          <ArticleSidebar tags={article.tags} />
         </div>
       </div>
     </article>

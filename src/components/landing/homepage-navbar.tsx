@@ -24,11 +24,11 @@ export function HomepageNavbar() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.1, duration: 0.5 }}
       className={`
-        fixed top-0 left-0 right-0 z-50 px-6 lg:px-12 py-3 transition-all duration-150 ease-out
+        fixed top-0 left-0 right-0 z-50 px-6 py-3 transition-all duration-150 ease-out
         ${hasScrolled ? "bg-background/80 backdrop-blur-md border-b border-border/50" : ""}
       `}
     >
-      <div className="w-full max-w-7xl mx-auto flex items-center justify-between">
+      <div className="w-full max-w-6xl mx-auto flex items-center justify-between">
         <Link href="/">
           <span
             className="text-xl sm:text-2xl text-foreground font-medium"

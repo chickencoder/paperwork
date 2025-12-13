@@ -45,8 +45,8 @@ function BlogContent() {
     : articles;
 
   return (
-    <div className="pt-24 sm:pt-32 pb-16 sm:pb-24 px-6 lg:px-12">
-      <div className="max-w-7xl mx-auto">
+    <div className="pt-24 sm:pt-32 pb-16 sm:pb-24 px-6">
+      <div className="max-w-6xl mx-auto">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -84,18 +84,15 @@ function BlogContent() {
 
         {/* Articles Grid */}
         {isLoading ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {[...Array(6)].map((_, i) => (
-              <div
-                key={i}
-                className="bg-card rounded-xl border border-border overflow-hidden animate-pulse"
-              >
-                <div className="aspect-[16/9] bg-muted" />
-                <div className="p-5 space-y-3">
-                  <div className="h-4 bg-muted rounded w-1/3" />
-                  <div className="h-6 bg-muted rounded w-3/4" />
+              <div key={i} className="animate-pulse">
+                <div className="aspect-[16/9] bg-muted rounded-lg mb-4" />
+                <div className="space-y-3">
+                  <div className="h-3 bg-muted rounded w-1/3" />
+                  <div className="h-5 bg-muted rounded w-3/4" />
                   <div className="h-4 bg-muted rounded w-full" />
-                  <div className="h-4 bg-muted rounded w-1/2" />
+                  <div className="h-4 bg-muted rounded w-1/4" />
                 </div>
               </div>
             ))}
@@ -113,7 +110,7 @@ function BlogContent() {
             </p>
           </motion.div>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {filteredArticles.map((article, index) => (
               <ArticleCard key={article.slug} article={article} index={index} />
             ))}
@@ -126,24 +123,21 @@ function BlogContent() {
 
 function BlogPageFallback() {
   return (
-    <div className="pt-24 sm:pt-32 pb-16 sm:pb-24 px-6 lg:px-12">
-      <div className="max-w-7xl mx-auto">
+    <div className="pt-24 sm:pt-32 pb-16 sm:pb-24 px-6">
+      <div className="max-w-6xl mx-auto">
         <div className="mb-12">
           <div className="h-12 bg-muted rounded w-32 mb-4 animate-pulse" />
           <div className="h-6 bg-muted rounded w-96 animate-pulse" />
         </div>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
           {[...Array(6)].map((_, i) => (
-            <div
-              key={i}
-              className="bg-card rounded-xl border border-border overflow-hidden animate-pulse"
-            >
-              <div className="aspect-[16/9] bg-muted" />
-              <div className="p-5 space-y-3">
-                <div className="h-4 bg-muted rounded w-1/3" />
-                <div className="h-6 bg-muted rounded w-3/4" />
+            <div key={i} className="animate-pulse">
+              <div className="aspect-[16/9] bg-muted rounded-lg mb-4" />
+              <div className="space-y-3">
+                <div className="h-3 bg-muted rounded w-1/3" />
+                <div className="h-5 bg-muted rounded w-3/4" />
                 <div className="h-4 bg-muted rounded w-full" />
-                <div className="h-4 bg-muted rounded w-1/2" />
+                <div className="h-4 bg-muted rounded w-1/4" />
               </div>
             </div>
           ))}
