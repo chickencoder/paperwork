@@ -14,6 +14,7 @@ import type {
   RedactionAnnotation,
   ShapeAnnotation,
   ShapeType,
+  InlineTextEdit,
 } from "@paperwork/pdf-lib";
 import { TextAnnotationOverlay } from "./fields/text-annotation";
 import { SignatureAnnotationOverlay } from "./fields/signature-annotation";
@@ -60,6 +61,7 @@ interface PDFViewerProps {
   strikethroughAnnotations: StrikethroughAnnotation[];
   redactionAnnotations: RedactionAnnotation[];
   shapeAnnotations: ShapeAnnotation[];
+  inlineTextEdits: InlineTextEdit[];
   activeTool: "select" | "text-insert" | "signature" | "shape";
   activeShapeType: ShapeType;
   selectedAnnotationId: string | null;
@@ -89,6 +91,7 @@ interface PDFViewerProps {
   onToolChange: (tool: "select" | "text-insert" | "signature" | "shape") => void;
   onSignaturePlaced: () => void;
   onFormFieldChange?: (fieldId: string, value: string | boolean, previousValue: string | boolean) => void;
+  onInlineTextEdit?: (edit: InlineTextEdit) => void;
   onDocumentLoad?: (numPages: number) => void;
   onCurrentPageChange?: (page: number) => void;
   isBackgrounded?: boolean;
@@ -122,6 +125,7 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
       strikethroughAnnotations,
       redactionAnnotations,
       shapeAnnotations,
+      inlineTextEdits,
       activeTool,
       activeShapeType,
       selectedAnnotationId,
@@ -142,6 +146,7 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
       onToolChange,
       onSignaturePlaced,
       onFormFieldChange,
+      onInlineTextEdit,
       onDocumentLoad,
       onCurrentPageChange,
       isBackgrounded = false,
@@ -303,6 +308,109 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
         container.removeEventListener("input", handleChange, true);
       };
     }, [onFormFieldChange]);
+
+    // Track original text content for inline edits
+    const originalTextMapRef = useRef<Map<HTMLElement, { text: string; pageIndex: number }>>(new Map());
+
+    // Make text layer spans editable for non-flattened PDFs
+    useEffect(() => {
+      const container = containerRef.current;
+      if (!container || !onInlineTextEdit) return;
+
+      // Function to setup editable text spans for a page
+      const setupEditableTextLayer = (pageElement: Element) => {
+        const pageIndex = parseInt(pageElement.getAttribute("data-page-index") || "0", 10);
+        const textLayer = pageElement.querySelector(".textLayer");
+        if (!textLayer) return;
+
+        const spans = textLayer.querySelectorAll("span");
+        spans.forEach((span) => {
+          // Skip if already set up
+          if (span.getAttribute("data-editable-setup")) return;
+
+          const htmlSpan = span as HTMLElement;
+          const originalText = htmlSpan.textContent || "";
+
+          // Skip empty spans
+          if (!originalText.trim()) return;
+
+          // Store original text
+          originalTextMapRef.current.set(htmlSpan, { text: originalText, pageIndex });
+
+          // Make editable
+          htmlSpan.contentEditable = "true";
+          htmlSpan.setAttribute("data-editable-setup", "true");
+          htmlSpan.style.cursor = "text";
+
+          // Prevent text selection issues
+          htmlSpan.style.userSelect = "text";
+          htmlSpan.style.webkitUserSelect = "text";
+
+          // Handle blur (when user finishes editing)
+          const handleBlur = () => {
+            const newText = htmlSpan.textContent || "";
+            const original = originalTextMapRef.current.get(htmlSpan);
+
+            if (original && newText !== original.text) {
+              const rect = htmlSpan.getBoundingClientRect();
+              const pageRect = pageElement.getBoundingClientRect();
+              const effectiveScale = scale * cssScale;
+
+              // Calculate position relative to page
+              const x = (rect.left - pageRect.left) / effectiveScale;
+              const y = (rect.top - pageRect.top) / effectiveScale;
+              const width = rect.width / effectiveScale;
+              const height = rect.height / effectiveScale;
+
+              // Estimate font size from height (typically text height ≈ fontSize)
+              const fontSize = Math.round(height * 0.85);
+
+              const edit: InlineTextEdit = {
+                id: `inline-edit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                page: original.pageIndex,
+                rect: { x, y, width, height },
+                originalText: original.text,
+                newText,
+                fontSize,
+              };
+
+              onInlineTextEdit(edit);
+
+              // Update the stored original text to the new value
+              originalTextMapRef.current.set(htmlSpan, { text: newText, pageIndex: original.pageIndex });
+            }
+          };
+
+          htmlSpan.addEventListener("blur", handleBlur);
+        });
+      };
+
+      // Setup observer to watch for new pages being rendered
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          mutation.addedNodes.forEach((node) => {
+            if (node instanceof Element) {
+              // Check if this is a page element or contains page elements
+              if (node.hasAttribute("data-page-index")) {
+                setupEditableTextLayer(node);
+              }
+              const pageElements = node.querySelectorAll("[data-page-index]");
+              pageElements.forEach(setupEditableTextLayer);
+            }
+          });
+        });
+      });
+
+      observer.observe(container, { childList: true, subtree: true });
+
+      // Setup existing pages
+      const existingPages = container.querySelectorAll("[data-page-index]");
+      existingPages.forEach(setupEditableTextLayer);
+
+      return () => {
+        observer.disconnect();
+      };
+    }, [onInlineTextEdit, scale, cssScale]);
 
     const onDocumentLoadSuccess = useCallback(
       ({ numPages }: { numPages: number }) => {

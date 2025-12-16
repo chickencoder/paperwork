@@ -7,6 +7,7 @@ import type {
   StrikethroughAnnotation,
   RedactionAnnotation,
   ShapeAnnotation,
+  InlineTextEdit,
   HighlightColor,
   StrikethroughColor,
   TextAnnotationColor,
@@ -228,6 +229,7 @@ export async function modifyPDF(
   strikethroughAnnotations: StrikethroughAnnotation[] = [],
   redactionAnnotations: RedactionAnnotation[] = [],
   shapeAnnotations: ShapeAnnotation[] = [],
+  inlineTextEdits: InlineTextEdit[] = [],
   options: ModifyPDFOptions = {}
 ): Promise<Uint8Array> {
   // Load the PDF
@@ -851,6 +853,46 @@ export async function modifyPDF(
             }
             break;
           }
+        }
+      }
+    }
+  }
+
+  // Apply inline text edits (for non-flattened PDFs)
+  if (inlineTextEdits.length > 0) {
+    const pages = pdfDoc.getPages();
+
+    // Embed font for replacement text
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+    for (const edit of inlineTextEdits) {
+      if (edit.page < pages.length) {
+        const page = pages[edit.page];
+        const pageHeight = page.getHeight();
+
+        // Calculate PDF coordinates (flip Y axis)
+        const pdfY = pageHeight - edit.rect.y - edit.rect.height;
+
+        // Draw white rectangle to cover original text
+        page.drawRectangle({
+          x: edit.rect.x,
+          y: pdfY,
+          width: edit.rect.width,
+          height: edit.rect.height,
+          color: rgb(1, 1, 1), // White
+          opacity: 1,
+          borderWidth: 0,
+        });
+
+        // Draw new text on top
+        if (edit.newText.trim()) {
+          page.drawText(edit.newText, {
+            x: edit.rect.x,
+            y: pdfY + edit.rect.height * 0.15, // Adjust baseline
+            size: edit.fontSize,
+            font,
+            color: rgb(0.1, 0.1, 0.1), // Near black
+          });
         }
       }
     }
