@@ -14,6 +14,7 @@ import type {
   RedactionAnnotation,
   ShapeAnnotation,
   ShapeType,
+  TextReplacementAnnotation,
 } from "@paperwork/pdf-lib";
 import { TextAnnotationOverlay } from "./fields/text-annotation";
 import { SignatureAnnotationOverlay } from "./fields/signature-annotation";
@@ -21,6 +22,7 @@ import { HighlightOverlay } from "./annotations/highlight-overlay";
 import { StrikethroughOverlay } from "./annotations/strikethrough-overlay";
 import { RedactionOverlay } from "./annotations/redaction-overlay";
 import { ShapeAnnotationOverlay, getShapeColorHex } from "./annotations/shape-annotation";
+import { TextReplacementOverlay } from "./annotations/text-replacement-overlay";
 import { PageSkeleton } from "./page-skeleton";
 import { useVirtualizedPages } from "@/hooks/use-virtualized-pages";
 
@@ -60,6 +62,7 @@ interface PDFViewerProps {
   strikethroughAnnotations: StrikethroughAnnotation[];
   redactionAnnotations: RedactionAnnotation[];
   shapeAnnotations: ShapeAnnotation[];
+  textReplacementAnnotations: TextReplacementAnnotation[];
   activeTool: "select" | "text-insert" | "signature" | "shape";
   activeShapeType: ShapeType;
   selectedAnnotationId: string | null;
@@ -82,6 +85,11 @@ interface PDFViewerProps {
     updates: Partial<Omit<ShapeAnnotation, "id" | "page">>
   ) => void;
   onRemoveShapeAnnotation: (id: string) => void;
+  onUpdateTextReplacement: (
+    id: string,
+    updates: Partial<Omit<TextReplacementAnnotation, "id" | "page">>
+  ) => void;
+  onRemoveTextReplacement: (id: string) => void;
   onRemoveHighlight: (id: string) => void;
   onRemoveStrikethrough: (id: string) => void;
   onRemoveRedaction: (id: string) => void;
@@ -102,6 +110,7 @@ interface AnnotationsByPage {
   strikethrough: StrikethroughAnnotation[];
   redaction: RedactionAnnotation[];
   shape: ShapeAnnotation[];
+  textReplacement: TextReplacementAnnotation[];
 }
 
 export interface PDFViewerHandle {
@@ -122,6 +131,7 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
       strikethroughAnnotations,
       redactionAnnotations,
       shapeAnnotations,
+      textReplacementAnnotations,
       activeTool,
       activeShapeType,
       selectedAnnotationId,
@@ -135,6 +145,8 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
       onAddShapeAnnotation,
       onUpdateShapeAnnotation,
       onRemoveShapeAnnotation,
+      onUpdateTextReplacement,
+      onRemoveTextReplacement,
       onRemoveHighlight,
       onRemoveStrikethrough,
       onRemoveRedaction,
@@ -184,6 +196,7 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
           strikethrough: [],
           redaction: [],
           shape: [],
+          textReplacement: [],
         });
       }
 
@@ -218,6 +231,11 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
         if (pageAnnotations) pageAnnotations.shape.push(a);
       });
 
+      textReplacementAnnotations.forEach((a) => {
+        const pageAnnotations = map.get(a.page);
+        if (pageAnnotations) pageAnnotations.textReplacement.push(a);
+      });
+
       return map;
     }, [
       numPages,
@@ -227,6 +245,7 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
       strikethroughAnnotations,
       redactionAnnotations,
       shapeAnnotations,
+      textReplacementAnnotations,
     ]);
 
     useImperativeHandle(ref, () => ({
@@ -935,6 +954,22 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(
                           onUpdateShapeAnnotation(annotation.id, updates)
                         }
                         onRemove={() => onRemoveShapeAnnotation(annotation.id)}
+                      />
+                    ))}
+
+                    {/* Text replacement annotations for this page */}
+                    {pageAnnotations?.textReplacement.map((annotation) => (
+                      <TextReplacementOverlay
+                        key={annotation.id}
+                        annotation={annotation}
+                        scale={scale}
+                        cssScale={cssScale}
+                        isSelected={selectedAnnotationId === annotation.id}
+                        onSelect={() => onSelectAnnotation(annotation.id)}
+                        onUpdate={(updates) =>
+                          onUpdateTextReplacement(annotation.id, updates)
+                        }
+                        onRemove={() => onRemoveTextReplacement(annotation.id)}
                       />
                     ))}
 

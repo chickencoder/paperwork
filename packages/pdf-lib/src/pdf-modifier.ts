@@ -7,6 +7,7 @@ import type {
   StrikethroughAnnotation,
   RedactionAnnotation,
   ShapeAnnotation,
+  TextReplacementAnnotation,
   HighlightColor,
   StrikethroughColor,
   TextAnnotationColor,
@@ -228,6 +229,7 @@ export async function modifyPDF(
   strikethroughAnnotations: StrikethroughAnnotation[] = [],
   redactionAnnotations: RedactionAnnotation[] = [],
   shapeAnnotations: ShapeAnnotation[] = [],
+  textReplacementAnnotations: TextReplacementAnnotation[] = [],
   options: ModifyPDFOptions = {}
 ): Promise<Uint8Array> {
   // Load the PDF
@@ -566,6 +568,111 @@ export async function modifyPDF(
             color: rgb(0, 0, 0),
             opacity: 1,
             borderWidth: 0,
+          });
+        }
+      }
+    }
+  }
+
+  // Add text replacement annotations (whiteout + replacement text)
+  if (textReplacementAnnotations.length > 0) {
+    // Embed all font families and their variants (reuse if already loaded above)
+    const fontFamilies: Record<FontFamily, {
+      regular: PDFFont;
+      bold: PDFFont;
+      italic: PDFFont;
+      boldItalic: PDFFont;
+    }> = {
+      helvetica: {
+        regular: await pdfDoc.embedFont(StandardFonts.Helvetica),
+        bold: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
+        italic: await pdfDoc.embedFont(StandardFonts.HelveticaOblique),
+        boldItalic: await pdfDoc.embedFont(StandardFonts.HelveticaBoldOblique),
+      },
+      times: {
+        regular: await pdfDoc.embedFont(StandardFonts.TimesRoman),
+        bold: await pdfDoc.embedFont(StandardFonts.TimesRomanBold),
+        italic: await pdfDoc.embedFont(StandardFonts.TimesRomanItalic),
+        boldItalic: await pdfDoc.embedFont(StandardFonts.TimesRomanBoldItalic),
+      },
+      courier: {
+        regular: await pdfDoc.embedFont(StandardFonts.Courier),
+        bold: await pdfDoc.embedFont(StandardFonts.CourierBold),
+        italic: await pdfDoc.embedFont(StandardFonts.CourierOblique),
+        boldItalic: await pdfDoc.embedFont(StandardFonts.CourierBoldOblique),
+      },
+    };
+    const pages = pdfDoc.getPages();
+
+    for (const annotation of textReplacementAnnotations) {
+      if (annotation.page < pages.length) {
+        const page = pages[annotation.page];
+        const pageHeight = page.getHeight();
+
+        // 1. Draw white rectangles to cover original text (one per line for multi-line)
+        for (const rect of annotation.whiteoutRects) {
+          const pdfY = pageHeight - rect.y - rect.height;
+          page.drawRectangle({
+            x: rect.x,
+            y: pdfY,
+            width: rect.width,
+            height: rect.height,
+            color: rgb(1, 1, 1), // White
+            opacity: 1,
+            borderWidth: 0,
+          });
+        }
+
+        // 2. Draw replacement text at first rect position
+        const firstRect = annotation.whiteoutRects[0];
+        if (annotation.replacementText.trim() && firstRect) {
+          // Select font family
+          const fontFamily = annotation.fontFamily ?? "helvetica";
+          const fonts = fontFamilies[fontFamily];
+
+          // Select font variant based on weight and style
+          const fontWeight = annotation.fontWeight ?? "normal";
+          const fontStyle = annotation.fontStyle ?? "normal";
+          let font: PDFFont;
+          if (fontWeight === "bold" && fontStyle === "italic") {
+            font = fonts.boldItalic;
+          } else if (fontWeight === "bold") {
+            font = fonts.bold;
+          } else if (fontStyle === "italic") {
+            font = fonts.italic;
+          } else {
+            font = fonts.regular;
+          }
+
+          // Get text color
+          const colorKey = annotation.color ?? "black";
+          const colorValue = TEXT_ANNOTATION_COLORS[colorKey];
+          const textColor = rgb(colorValue.r, colorValue.g, colorValue.b);
+
+          // Get text alignment
+          const textAlign = annotation.textAlign ?? "left";
+
+          // Calculate X position based on alignment (single line, no wrapping)
+          const text = annotation.replacementText;
+          const textWidth = font.widthOfTextAtSize(text, annotation.fontSize);
+          let textX = firstRect.x;
+          if (textAlign === "center") {
+            textX = firstRect.x + (firstRect.width - textWidth) / 2;
+          } else if (textAlign === "right") {
+            textX = firstRect.x + firstRect.width - textWidth;
+          }
+
+          // Calculate Y position - vertically center text in the first rect
+          // PDF coordinates: Y increases upward, so we need to position from bottom
+          // Font baseline is at the bottom of the text, so we account for that
+          const textY = pageHeight - firstRect.y - (firstRect.height + annotation.fontSize) / 2;
+
+          page.drawText(text, {
+            x: textX,
+            y: textY,
+            size: annotation.fontSize,
+            font,
+            color: textColor,
           });
         }
       }

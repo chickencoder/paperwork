@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Highlighter, Strikethrough, ChevronDown, EyeOff } from "lucide-react";
+import { Highlighter, Strikethrough, ChevronDown, EyeOff, TextCursorInput } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { HighlightColor, StrikethroughColor } from "@paperwork/pdf-lib";
 import {
@@ -13,15 +13,20 @@ import {
 
 // Note: These are intentionally hardcoded Tailwind colors for the highlighting feature
 // They represent specific highlight marker colors, not design system colors
-const HIGHLIGHT_COLORS: { color: HighlightColor; bg: string; label: string }[] = [
-  { color: "yellow", bg: "bg-yellow-300", label: "Yellow" },
-  { color: "green", bg: "bg-green-300", label: "Green" },
-  { color: "blue", bg: "bg-blue-300", label: "Blue" },
-  { color: "pink", bg: "bg-pink-300", label: "Pink" },
-  { color: "orange", bg: "bg-orange-300", label: "Orange" },
-];
+const HIGHLIGHT_COLORS: { color: HighlightColor; bg: string; label: string }[] =
+  [
+    { color: "yellow", bg: "bg-yellow-300", label: "Yellow" },
+    { color: "green", bg: "bg-green-300", label: "Green" },
+    { color: "blue", bg: "bg-blue-300", label: "Blue" },
+    { color: "pink", bg: "bg-pink-300", label: "Pink" },
+    { color: "orange", bg: "bg-orange-300", label: "Orange" },
+  ];
 
-const STRIKETHROUGH_COLORS: { color: StrikethroughColor; bg: string; label: string }[] = [
+const STRIKETHROUGH_COLORS: {
+  color: StrikethroughColor;
+  bg: string;
+  label: string;
+}[] = [
   { color: "red", bg: "bg-red-500", label: "Red" },
   { color: "black", bg: "bg-stone-800", label: "Black" },
 ];
@@ -31,6 +36,7 @@ interface SelectionToolbarProps {
   onHighlight: (color: HighlightColor) => void;
   onStrikethrough: (color: StrikethroughColor) => void;
   onRedact: () => void;
+  onReplace?: () => void;
 }
 
 export function SelectionToolbar({
@@ -38,6 +44,7 @@ export function SelectionToolbar({
   onHighlight,
   onStrikethrough,
   onRedact,
+  onReplace,
 }: SelectionToolbarProps) {
   const [showHighlightPicker, setShowHighlightPicker] = useState(false);
   const [showStrikethroughPicker, setShowStrikethroughPicker] = useState(false);
@@ -50,10 +57,13 @@ export function SelectionToolbar({
 
       // Get fresh position from the current selection
       const selection = window.getSelection();
-      if (!selection || selection.isCollapsed || selection.rangeCount === 0) return;
+      if (!selection || selection.isCollapsed || selection.rangeCount === 0)
+        return;
 
       const range = selection.getRangeAt(0);
-      const rects = Array.from(range.getClientRects()).filter(r => r.width > 1 && r.height > 1);
+      const rects = Array.from(range.getClientRects()).filter(
+        (r) => r.width > 1 && r.height > 1
+      );
       if (rects.length === 0) return;
 
       const firstRect = rects[0];
@@ -163,7 +173,8 @@ export function SelectionToolbar({
                   className={cn(
                     "flex items-center gap-1 px-2 md:px-2 px-3 py-1.5 md:py-1.5 py-2.5 rounded-full transition-colors",
                     "text-muted-foreground hover:text-destructive hover:bg-destructive/10",
-                    showStrikethroughPicker && "bg-destructive/10 text-destructive"
+                    showStrikethroughPicker &&
+                      "bg-destructive/10 text-destructive"
                   )}
                   onMouseDown={preventSelectionLoss}
                   onClick={(e) => {
@@ -231,6 +242,33 @@ export function SelectionToolbar({
             </TooltipTrigger>
             <TooltipContent side="top">Redact</TooltipContent>
           </Tooltip>
+
+          {/* Replace button */}
+          {onReplace && (
+            <>
+              <div className="w-px h-5 md:h-5 h-7 bg-border mx-0.5 md:mx-0.5 mx-1" />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className={cn(
+                      "flex items-center gap-1 px-2 md:px-2 px-3 py-1.5 md:py-1.5 py-2.5 rounded-full transition-colors",
+                      "text-muted-foreground hover:text-foreground hover:bg-accent"
+                    )}
+                    onMouseDown={preventSelectionLoss}
+                    onClick={(e) => {
+                      preventSelectionLoss(e);
+                      onReplace();
+                      closeDropdowns();
+                    }}
+                  >
+                    <TextCursorInput className="w-4 h-4 md:w-4 md:h-4 w-5 h-5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Replace Text</TooltipContent>
+              </Tooltip>
+            </>
+          )}
         </div>
       </div>
     </TooltipProvider>

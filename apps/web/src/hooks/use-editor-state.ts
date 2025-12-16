@@ -7,6 +7,7 @@ import type {
   RedactionAnnotation,
   ShapeAnnotation,
   ShapeType,
+  TextReplacementAnnotation,
 } from "@paperwork/pdf-lib";
 
 // History configuration
@@ -19,7 +20,8 @@ type ClipboardAnnotation =
   | { type: "highlight"; data: Omit<HighlightAnnotation, "id"> }
   | { type: "strikethrough"; data: Omit<StrikethroughAnnotation, "id"> }
   | { type: "redaction"; data: Omit<RedactionAnnotation, "id"> }
-  | { type: "shape"; data: Omit<ShapeAnnotation, "id"> };
+  | { type: "shape"; data: Omit<ShapeAnnotation, "id"> }
+  | { type: "textReplacement"; data: Omit<TextReplacementAnnotation, "id"> };
 
 interface EditorState {
   pdfFile: File | null;
@@ -31,6 +33,7 @@ interface EditorState {
   strikethroughAnnotations: StrikethroughAnnotation[];
   redactionAnnotations: RedactionAnnotation[];
   shapeAnnotations: ShapeAnnotation[];
+  textReplacementAnnotations: TextReplacementAnnotation[];
   selectedAnnotationId: string | null;
   activeTool: "select" | "text-insert" | "signature" | "shape";
   activeShapeType: ShapeType;
@@ -55,6 +58,9 @@ type EditorAction =
   | { type: "ADD_SHAPE_ANNOTATION"; annotation: ShapeAnnotation }
   | { type: "UPDATE_SHAPE_ANNOTATION"; id: string; updates: Partial<Omit<ShapeAnnotation, "id" | "page">> }
   | { type: "REMOVE_SHAPE_ANNOTATION"; id: string }
+  | { type: "ADD_TEXT_REPLACEMENT"; annotation: TextReplacementAnnotation }
+  | { type: "UPDATE_TEXT_REPLACEMENT"; id: string; updates: Partial<Omit<TextReplacementAnnotation, "id" | "page">> }
+  | { type: "REMOVE_TEXT_REPLACEMENT"; id: string }
   | { type: "SET_SCALE"; scale: number }
   | { type: "SET_ACTIVE_TOOL"; tool: "select" | "text-insert" | "signature" | "shape" }
   | { type: "SET_ACTIVE_SHAPE_TYPE"; shapeType: ShapeType }
@@ -83,6 +89,9 @@ type UndoableAction = Extract<
   | { type: "ADD_SHAPE_ANNOTATION" }
   | { type: "UPDATE_SHAPE_ANNOTATION" }
   | { type: "REMOVE_SHAPE_ANNOTATION" }
+  | { type: "ADD_TEXT_REPLACEMENT" }
+  | { type: "UPDATE_TEXT_REPLACEMENT" }
+  | { type: "REMOVE_TEXT_REPLACEMENT" }
   | { type: "SET_FORM_FIELD" }
 >;
 
@@ -103,6 +112,9 @@ const UNDOABLE_ACTION_TYPES = [
   "ADD_SHAPE_ANNOTATION",
   "UPDATE_SHAPE_ANNOTATION",
   "REMOVE_SHAPE_ANNOTATION",
+  "ADD_TEXT_REPLACEMENT",
+  "UPDATE_TEXT_REPLACEMENT",
+  "REMOVE_TEXT_REPLACEMENT",
   "SET_FORM_FIELD",
 ] as const;
 
@@ -130,6 +142,7 @@ export interface EditorSnapshot {
   strikethroughAnnotations: StrikethroughAnnotation[];
   redactionAnnotations: RedactionAnnotation[];
   shapeAnnotations: ShapeAnnotation[];
+  textReplacementAnnotations: TextReplacementAnnotation[];
   selectedAnnotationId: string | null;
   activeTool: "select" | "text-insert" | "signature" | "shape";
   activeShapeType: ShapeType;
@@ -154,6 +167,7 @@ const initialState: EditorState = {
   strikethroughAnnotations: [],
   redactionAnnotations: [],
   shapeAnnotations: [],
+  textReplacementAnnotations: [],
   selectedAnnotationId: null,
   activeTool: "select",
   activeShapeType: "rectangle",
@@ -177,6 +191,7 @@ function getActionAnnotationId(action: UndoableAction): string | null {
     case "UPDATE_TEXT_ANNOTATION":
     case "UPDATE_SIGNATURE_ANNOTATION":
     case "UPDATE_SHAPE_ANNOTATION":
+    case "UPDATE_TEXT_REPLACEMENT":
       return action.id;
     case "SET_FORM_FIELD":
       return action.fieldId;
@@ -210,6 +225,9 @@ function computeInverseAction(
     case "ADD_SHAPE_ANNOTATION":
       return { type: "REMOVE_SHAPE_ANNOTATION", id: action.annotation.id };
 
+    case "ADD_TEXT_REPLACEMENT":
+      return { type: "REMOVE_TEXT_REPLACEMENT", id: action.annotation.id };
+
     // REMOVE actions -> inverse is ADD (capture the removed item)
     case "REMOVE_TEXT_ANNOTATION": {
       const annotation = state.textAnnotations.find((a) => a.id === action.id);
@@ -241,6 +259,11 @@ function computeInverseAction(
       return annotation ? { type: "ADD_SHAPE_ANNOTATION", annotation } : null;
     }
 
+    case "REMOVE_TEXT_REPLACEMENT": {
+      const annotation = state.textReplacementAnnotations.find((a) => a.id === action.id);
+      return annotation ? { type: "ADD_TEXT_REPLACEMENT", annotation } : null;
+    }
+
     // UPDATE actions -> inverse is UPDATE with previous values
     case "UPDATE_TEXT_ANNOTATION": {
       const annotation = state.textAnnotations.find((a) => a.id === action.id);
@@ -270,6 +293,16 @@ function computeInverseAction(
         (previousValues as Record<string, unknown>)[key] = annotation[key];
       }
       return { type: "UPDATE_SHAPE_ANNOTATION", id: action.id, updates: previousValues };
+    }
+
+    case "UPDATE_TEXT_REPLACEMENT": {
+      const annotation = state.textReplacementAnnotations.find((a) => a.id === action.id);
+      if (!annotation) return null;
+      const previousValues: Partial<Omit<TextReplacementAnnotation, "id" | "page">> = {};
+      for (const key of Object.keys(action.updates) as (keyof typeof action.updates)[]) {
+        (previousValues as Record<string, unknown>)[key] = annotation[key];
+      }
+      return { type: "UPDATE_TEXT_REPLACEMENT", id: action.id, updates: previousValues };
     }
 
     // TOGGLE actions -> inverse is the same toggle (self-inverse)
@@ -404,6 +437,26 @@ function editorReducer(state: EditorState, action: EditorAction): EditorState {
         shapeAnnotations: state.shapeAnnotations.filter((a) => a.id !== action.id),
       };
 
+    case "ADD_TEXT_REPLACEMENT":
+      return {
+        ...state,
+        textReplacementAnnotations: [...state.textReplacementAnnotations, action.annotation],
+      };
+
+    case "UPDATE_TEXT_REPLACEMENT":
+      return {
+        ...state,
+        textReplacementAnnotations: state.textReplacementAnnotations.map((a) =>
+          a.id === action.id ? { ...a, ...action.updates } : a
+        ),
+      };
+
+    case "REMOVE_TEXT_REPLACEMENT":
+      return {
+        ...state,
+        textReplacementAnnotations: state.textReplacementAnnotations.filter((a) => a.id !== action.id),
+      };
+
     case "SET_SCALE":
       return {
         ...state,
@@ -527,6 +580,7 @@ function editorReducerWithHistory(
           strikethroughAnnotations: snapshot.strikethroughAnnotations,
           redactionAnnotations: snapshot.redactionAnnotations,
           shapeAnnotations: snapshot.shapeAnnotations,
+          textReplacementAnnotations: snapshot.textReplacementAnnotations,
           selectedAnnotationId: snapshot.selectedAnnotationId,
           activeTool: snapshot.activeTool,
           activeShapeType: snapshot.activeShapeType,
@@ -555,6 +609,7 @@ function editorReducerWithHistory(
             (action.type === "UPDATE_TEXT_ANNOTATION" ||
               action.type === "UPDATE_SIGNATURE_ANNOTATION" ||
               action.type === "UPDATE_SHAPE_ANNOTATION" ||
+              action.type === "UPDATE_TEXT_REPLACEMENT" ||
               action.type === "SET_FORM_FIELD")
           ) {
             const lastEntry = state.past[state.past.length - 1];
@@ -734,6 +789,21 @@ export function useEditorState() {
     dispatch({ type: "REMOVE_SHAPE_ANNOTATION", id });
   }, []);
 
+  const addTextReplacement = useCallback((annotation: TextReplacementAnnotation) => {
+    dispatch({ type: "ADD_TEXT_REPLACEMENT", annotation });
+  }, []);
+
+  const updateTextReplacement = useCallback(
+    (id: string, updates: Partial<Omit<TextReplacementAnnotation, "id" | "page">>) => {
+      dispatch({ type: "UPDATE_TEXT_REPLACEMENT", id, updates });
+    },
+    []
+  );
+
+  const removeTextReplacement = useCallback((id: string) => {
+    dispatch({ type: "REMOVE_TEXT_REPLACEMENT", id });
+  }, []);
+
   // Track form field changes for undo/redo (values stored in DOM)
   const setFormField = useCallback(
     (fieldId: string, value: string | boolean, previousValue: string | boolean) => {
@@ -798,7 +868,14 @@ export function useEditorState() {
       dispatch({ type: "COPY_TO_CLIPBOARD", annotation: { type: "shape", data } });
       return;
     }
-  }, [state.selectedAnnotationId, state.textAnnotations, state.signatureAnnotations, state.highlightAnnotations, state.strikethroughAnnotations, state.redactionAnnotations, state.shapeAnnotations]);
+
+    const textReplacementAnnotation = state.textReplacementAnnotations.find((a) => a.id === id);
+    if (textReplacementAnnotation) {
+      const { id: _, ...data } = textReplacementAnnotation;
+      dispatch({ type: "COPY_TO_CLIPBOARD", annotation: { type: "textReplacement", data } });
+      return;
+    }
+  }, [state.selectedAnnotationId, state.textAnnotations, state.signatureAnnotations, state.highlightAnnotations, state.strikethroughAnnotations, state.redactionAnnotations, state.shapeAnnotations, state.textReplacementAnnotations]);
 
   // Paste annotation from clipboard at the specified position
   const pasteAnnotation = useCallback(
@@ -947,6 +1024,37 @@ export function useEditorState() {
           dispatch({ type: "SELECT_ANNOTATION", id: newId });
           break;
         }
+        case "textReplacement": {
+          const data = state.clipboard.data;
+          // Calculate bounds of all rects to find center offset
+          const bounds = data.whiteoutRects.reduce(
+            (acc, rect) => ({
+              minX: Math.min(acc.minX, rect.x),
+              minY: Math.min(acc.minY, rect.y),
+              maxX: Math.max(acc.maxX, rect.x + rect.width),
+              maxY: Math.max(acc.maxY, rect.y + rect.height),
+            }),
+            { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity }
+          );
+          const currentCenterX = (bounds.minX + bounds.maxX) / 2;
+          const currentCenterY = (bounds.minY + bounds.maxY) / 2;
+          const offsetX = position.x - currentCenterX;
+          const offsetY = position.y - currentCenterY;
+          // Center the text replacement on the paste position
+          const annotation: TextReplacementAnnotation = {
+            ...data,
+            id: newId,
+            page: pageIndex,
+            whiteoutRects: data.whiteoutRects.map(rect => ({
+              ...rect,
+              x: rect.x + offsetX,
+              y: rect.y + offsetY,
+            })),
+          };
+          dispatch({ type: "ADD_TEXT_REPLACEMENT", annotation });
+          dispatch({ type: "SELECT_ANNOTATION", id: newId });
+          break;
+        }
       }
     },
     [state.clipboard]
@@ -970,8 +1078,10 @@ export function useEditorState() {
       dispatch({ type: "REMOVE_REDACTION", id });
     } else if (state.shapeAnnotations.find((a) => a.id === id)) {
       dispatch({ type: "REMOVE_SHAPE_ANNOTATION", id });
+    } else if (state.textReplacementAnnotations.find((a) => a.id === id)) {
+      dispatch({ type: "REMOVE_TEXT_REPLACEMENT", id });
     }
-  }, [state.selectedAnnotationId, state.textAnnotations, state.signatureAnnotations, state.highlightAnnotations, state.strikethroughAnnotations, state.redactionAnnotations, state.shapeAnnotations]);
+  }, [state.selectedAnnotationId, state.textAnnotations, state.signatureAnnotations, state.highlightAnnotations, state.strikethroughAnnotations, state.redactionAnnotations, state.shapeAnnotations, state.textReplacementAnnotations]);
 
   // Get current state as a snapshot for saving to multi-document state
   const getSnapshot = useCallback((): EditorSnapshot => {
@@ -983,6 +1093,7 @@ export function useEditorState() {
       strikethroughAnnotations: state.strikethroughAnnotations,
       redactionAnnotations: state.redactionAnnotations,
       shapeAnnotations: state.shapeAnnotations,
+      textReplacementAnnotations: state.textReplacementAnnotations,
       selectedAnnotationId: state.selectedAnnotationId,
       activeTool: state.activeTool,
       activeShapeType: state.activeShapeType,
@@ -1018,6 +1129,9 @@ export function useEditorState() {
     addShapeAnnotation,
     updateShapeAnnotation,
     removeShapeAnnotation,
+    addTextReplacement,
+    updateTextReplacement,
+    removeTextReplacement,
     setFormField,
     setScale,
     // Alias for zoom hook compatibility

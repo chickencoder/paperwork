@@ -76,6 +76,9 @@ export function PDFEditor({
     addShapeAnnotation,
     updateShapeAnnotation,
     removeShapeAnnotation,
+    addTextReplacement,
+    updateTextReplacement,
+    removeTextReplacement,
     setActiveTool,
     setActiveShapeType,
     selectAnnotation,
@@ -206,7 +209,7 @@ export function PDFEditor({
     }, 100); // Debounce by 100ms
 
     return () => clearTimeout(timer);
-  }, [onStateChange, getSnapshot, isDirty, state.pdfFile, state.scale, state.textAnnotations, state.signatureAnnotations, state.highlightAnnotations, state.strikethroughAnnotations, state.redactionAnnotations, state.shapeAnnotations, state.selectedAnnotationId, state.activeTool, state.activeShapeType, state.clipboard]);
+  }, [onStateChange, getSnapshot, isDirty, state.pdfFile, state.scale, state.textAnnotations, state.signatureAnnotations, state.highlightAnnotations, state.strikethroughAnnotations, state.redactionAnnotations, state.shapeAnnotations, state.textReplacementAnnotations, state.selectedAnnotationId, state.activeTool, state.activeShapeType, state.clipboard]);
 
   // Get current visible page index (first page that's at least partially visible)
   const getCurrentPageIndex = useCallback(() => {
@@ -474,6 +477,39 @@ export function PDFEditor({
     clearSelection();
   }, [selection, addRedaction, clearSelection]);
 
+  // Handle text replacement from text selection
+  const handleReplace = useCallback(() => {
+    if (!selection || selection.rects.length === 0) return;
+
+    // Use individual line rects directly (already merged per-line by use-text-selection)
+    // This preserves multi-line selections as separate whiteout areas
+    const whiteoutRects = selection.rects;
+
+    // Estimate font size from the first rect height (typical text line)
+    // Font size is roughly 75% of the line height
+    const firstRect = whiteoutRects[0];
+    const estimatedFontSize = Math.round(firstRect.height * 0.75);
+    const fontSize = Math.max(8, Math.min(72, estimatedFontSize));
+
+    const id = `text-replacement-${Date.now()}`;
+    addTextReplacement({
+      id,
+      page: selection.pageIndex,
+      originalText: selection.text,
+      replacementText: selection.text, // Start with original text for editing
+      whiteoutRects,
+      fontSize,
+      fontFamily: "helvetica",
+      fontWeight: "normal",
+      fontStyle: "normal",
+      color: "black",
+      textAlign: "left",
+    });
+
+    clearSelection();
+    selectAnnotation(id);
+  }, [selection, addTextReplacement, clearSelection, selectAnnotation]);
+
   const handleDownload = useCallback(async (options: { rasterize: boolean; hasRedactions: boolean }) => {
     if (!state.pdfBytes) return;
 
@@ -496,6 +532,7 @@ export function PDFEditor({
         state.strikethroughAnnotations,
         state.redactionAnnotations,
         state.shapeAnnotations,
+        state.textReplacementAnnotations,
         options.rasterize ? { rasterize: true } : undefined
       );
 
@@ -621,6 +658,7 @@ export function PDFEditor({
           strikethroughAnnotations={state.strikethroughAnnotations}
           redactionAnnotations={state.redactionAnnotations}
           shapeAnnotations={state.shapeAnnotations}
+          textReplacementAnnotations={state.textReplacementAnnotations}
           activeTool={state.activeTool}
           activeShapeType={state.activeShapeType}
           selectedAnnotationId={state.selectedAnnotationId}
@@ -637,6 +675,8 @@ export function PDFEditor({
           onAddShapeAnnotation={addShapeAnnotation}
           onUpdateShapeAnnotation={updateShapeAnnotation}
           onRemoveShapeAnnotation={removeShapeAnnotation}
+          onUpdateTextReplacement={updateTextReplacement}
+          onRemoveTextReplacement={removeTextReplacement}
           onToolChange={setActiveTool}
           onSelectAnnotation={selectAnnotation}
           onSignaturePlaced={handleSignaturePlaced}
@@ -653,6 +693,7 @@ export function PDFEditor({
           onHighlight={handleHighlight}
           onStrikethrough={handleStrikethrough}
           onRedact={handleRedact}
+          onReplace={handleReplace}
         />
       )}
 

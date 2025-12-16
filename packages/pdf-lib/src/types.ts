@@ -157,6 +157,23 @@ export interface RedactionAnnotation {
   enabled: boolean;
 }
 
+export interface TextReplacementAnnotation {
+  id: string;
+  page: number;
+  // Original text info (for reference)
+  originalText: string;
+  // Whiteout rectangles (covers original text - one per line for multi-line selections)
+  whiteoutRects: AnnotationRect[];
+  // Replacement text (positioned at first whiteout location)
+  replacementText: string;
+  fontSize: number;
+  fontFamily: FontFamily;
+  fontWeight: "normal" | "bold";
+  fontStyle: FontStyle;
+  color: TextAnnotationColor;
+  textAlign: TextAlign;
+}
+
 export type FieldValue = string | boolean;
 
 export interface EditorState {

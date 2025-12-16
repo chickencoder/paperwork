@@ -7,6 +7,7 @@ import type {
   RedactionAnnotation,
   ShapeAnnotation,
   ShapeType,
+  TextReplacementAnnotation,
 } from "@paperwork/pdf-lib";
 
 // Unique identifier for each tab/document session
@@ -19,7 +20,8 @@ type ClipboardAnnotation =
   | { type: "highlight"; data: Omit<HighlightAnnotation, "id"> }
   | { type: "strikethrough"; data: Omit<StrikethroughAnnotation, "id"> }
   | { type: "redaction"; data: Omit<RedactionAnnotation, "id"> }
-  | { type: "shape"; data: Omit<ShapeAnnotation, "id"> };
+  | { type: "shape"; data: Omit<ShapeAnnotation, "id"> }
+  | { type: "textReplacement"; data: Omit<TextReplacementAnnotation, "id"> };
 
 // Editor state snapshot (what we persist per tab)
 export interface EditorSnapshot {
@@ -30,6 +32,7 @@ export interface EditorSnapshot {
   strikethroughAnnotations: StrikethroughAnnotation[];
   redactionAnnotations: RedactionAnnotation[];
   shapeAnnotations: ShapeAnnotation[];
+  textReplacementAnnotations: TextReplacementAnnotation[];
   selectedAnnotationId: string | null;
   activeTool: "select" | "text-insert" | "signature" | "shape";
   activeShapeType: ShapeType;
@@ -63,6 +66,7 @@ function createDefaultSnapshot(): EditorSnapshot {
     strikethroughAnnotations: [],
     redactionAnnotations: [],
     shapeAnnotations: [],
+    textReplacementAnnotations: [],
     selectedAnnotationId: null,
     activeTool: "select",
     activeShapeType: "rectangle",
