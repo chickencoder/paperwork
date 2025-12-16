@@ -7,6 +7,7 @@ import type {
   RedactionAnnotation,
   ShapeAnnotation,
   ShapeType,
+  InlineTextEdit,
 } from "@paperwork/pdf-lib";
 
 // History configuration
@@ -19,7 +20,8 @@ type ClipboardAnnotation =
   | { type: "highlight"; data: Omit<HighlightAnnotation, "id"> }
   | { type: "strikethrough"; data: Omit<StrikethroughAnnotation, "id"> }
   | { type: "redaction"; data: Omit<RedactionAnnotation, "id"> }
-  | { type: "shape"; data: Omit<ShapeAnnotation, "id"> };
+  | { type: "shape"; data: Omit<ShapeAnnotation, "id"> }
+  | { type: "inlineTextEdit"; data: Omit<InlineTextEdit, "id"> };
 
 interface EditorState {
   pdfFile: File | null;
@@ -31,6 +33,7 @@ interface EditorState {
   strikethroughAnnotations: StrikethroughAnnotation[];
   redactionAnnotations: RedactionAnnotation[];
   shapeAnnotations: ShapeAnnotation[];
+  inlineTextEdits: InlineTextEdit[];
   selectedAnnotationId: string | null;
   activeTool: "select" | "text-insert" | "signature" | "shape";
   activeShapeType: ShapeType;
@@ -55,6 +58,9 @@ type EditorAction =
   | { type: "ADD_SHAPE_ANNOTATION"; annotation: ShapeAnnotation }
   | { type: "UPDATE_SHAPE_ANNOTATION"; id: string; updates: Partial<Omit<ShapeAnnotation, "id" | "page">> }
   | { type: "REMOVE_SHAPE_ANNOTATION"; id: string }
+  | { type: "ADD_INLINE_TEXT_EDIT"; edit: InlineTextEdit }
+  | { type: "UPDATE_INLINE_TEXT_EDIT"; id: string; newText: string }
+  | { type: "REMOVE_INLINE_TEXT_EDIT"; id: string }
   | { type: "SET_SCALE"; scale: number }
   | { type: "SET_ACTIVE_TOOL"; tool: "select" | "text-insert" | "signature" | "shape" }
   | { type: "SET_ACTIVE_SHAPE_TYPE"; shapeType: ShapeType }
@@ -83,6 +89,9 @@ type UndoableAction = Extract<
   | { type: "ADD_SHAPE_ANNOTATION" }
   | { type: "UPDATE_SHAPE_ANNOTATION" }
   | { type: "REMOVE_SHAPE_ANNOTATION" }
+  | { type: "ADD_INLINE_TEXT_EDIT" }
+  | { type: "UPDATE_INLINE_TEXT_EDIT" }
+  | { type: "REMOVE_INLINE_TEXT_EDIT" }
   | { type: "SET_FORM_FIELD" }
 >;
 
@@ -103,6 +112,9 @@ const UNDOABLE_ACTION_TYPES = [
   "ADD_SHAPE_ANNOTATION",
   "UPDATE_SHAPE_ANNOTATION",
   "REMOVE_SHAPE_ANNOTATION",
+  "ADD_INLINE_TEXT_EDIT",
+  "UPDATE_INLINE_TEXT_EDIT",
+  "REMOVE_INLINE_TEXT_EDIT",
   "SET_FORM_FIELD",
 ] as const;
 
@@ -130,6 +142,7 @@ export interface EditorSnapshot {
   strikethroughAnnotations: StrikethroughAnnotation[];
   redactionAnnotations: RedactionAnnotation[];
   shapeAnnotations: ShapeAnnotation[];
+  inlineTextEdits: InlineTextEdit[];
   selectedAnnotationId: string | null;
   activeTool: "select" | "text-insert" | "signature" | "shape";
   activeShapeType: ShapeType;
@@ -154,6 +167,7 @@ const initialState: EditorState = {
   strikethroughAnnotations: [],
   redactionAnnotations: [],
   shapeAnnotations: [],
+  inlineTextEdits: [],
   selectedAnnotationId: null,
   activeTool: "select",
   activeShapeType: "rectangle",
@@ -177,6 +191,7 @@ function getActionAnnotationId(action: UndoableAction): string | null {
     case "UPDATE_TEXT_ANNOTATION":
     case "UPDATE_SIGNATURE_ANNOTATION":
     case "UPDATE_SHAPE_ANNOTATION":
+    case "UPDATE_INLINE_TEXT_EDIT":
       return action.id;
     case "SET_FORM_FIELD":
       return action.fieldId;
@@ -284,6 +299,21 @@ function computeInverseAction(
         value: action.previousValue,
         previousValue: action.value,
       };
+
+    // Inline text edit actions
+    case "ADD_INLINE_TEXT_EDIT":
+      return { type: "REMOVE_INLINE_TEXT_EDIT", id: action.edit.id };
+
+    case "REMOVE_INLINE_TEXT_EDIT": {
+      const edit = state.inlineTextEdits.find((e) => e.id === action.id);
+      return edit ? { type: "ADD_INLINE_TEXT_EDIT", edit } : null;
+    }
+
+    case "UPDATE_INLINE_TEXT_EDIT": {
+      const edit = state.inlineTextEdits.find((e) => e.id === action.id);
+      if (!edit) return null;
+      return { type: "UPDATE_INLINE_TEXT_EDIT", id: action.id, newText: edit.newText };
+    }
 
     default:
       return null;
@@ -402,6 +432,26 @@ function editorReducer(state: EditorState, action: EditorAction): EditorState {
       return {
         ...state,
         shapeAnnotations: state.shapeAnnotations.filter((a) => a.id !== action.id),
+      };
+
+    case "ADD_INLINE_TEXT_EDIT":
+      return {
+        ...state,
+        inlineTextEdits: [...state.inlineTextEdits, action.edit],
+      };
+
+    case "UPDATE_INLINE_TEXT_EDIT":
+      return {
+        ...state,
+        inlineTextEdits: state.inlineTextEdits.map((e) =>
+          e.id === action.id ? { ...e, newText: action.newText } : e
+        ),
+      };
+
+    case "REMOVE_INLINE_TEXT_EDIT":
+      return {
+        ...state,
+        inlineTextEdits: state.inlineTextEdits.filter((e) => e.id !== action.id),
       };
 
     case "SET_SCALE":
@@ -527,6 +577,7 @@ function editorReducerWithHistory(
           strikethroughAnnotations: snapshot.strikethroughAnnotations,
           redactionAnnotations: snapshot.redactionAnnotations,
           shapeAnnotations: snapshot.shapeAnnotations,
+          inlineTextEdits: snapshot.inlineTextEdits,
           selectedAnnotationId: snapshot.selectedAnnotationId,
           activeTool: snapshot.activeTool,
           activeShapeType: snapshot.activeShapeType,
@@ -555,6 +606,7 @@ function editorReducerWithHistory(
             (action.type === "UPDATE_TEXT_ANNOTATION" ||
               action.type === "UPDATE_SIGNATURE_ANNOTATION" ||
               action.type === "UPDATE_SHAPE_ANNOTATION" ||
+              action.type === "UPDATE_INLINE_TEXT_EDIT" ||
               action.type === "SET_FORM_FIELD")
           ) {
             const lastEntry = state.past[state.past.length - 1];
@@ -732,6 +784,19 @@ export function useEditorState() {
 
   const removeShapeAnnotation = useCallback((id: string) => {
     dispatch({ type: "REMOVE_SHAPE_ANNOTATION", id });
+  }, []);
+
+  // Inline text edit functions (for non-flattened PDFs)
+  const addInlineTextEdit = useCallback((edit: InlineTextEdit) => {
+    dispatch({ type: "ADD_INLINE_TEXT_EDIT", edit });
+  }, []);
+
+  const updateInlineTextEdit = useCallback((id: string, newText: string) => {
+    dispatch({ type: "UPDATE_INLINE_TEXT_EDIT", id, newText });
+  }, []);
+
+  const removeInlineTextEdit = useCallback((id: string) => {
+    dispatch({ type: "REMOVE_INLINE_TEXT_EDIT", id });
   }, []);
 
   // Track form field changes for undo/redo (values stored in DOM)
@@ -983,6 +1048,7 @@ export function useEditorState() {
       strikethroughAnnotations: state.strikethroughAnnotations,
       redactionAnnotations: state.redactionAnnotations,
       shapeAnnotations: state.shapeAnnotations,
+      inlineTextEdits: state.inlineTextEdits,
       selectedAnnotationId: state.selectedAnnotationId,
       activeTool: state.activeTool,
       activeShapeType: state.activeShapeType,
@@ -1018,6 +1084,9 @@ export function useEditorState() {
     addShapeAnnotation,
     updateShapeAnnotation,
     removeShapeAnnotation,
+    addInlineTextEdit,
+    updateInlineTextEdit,
+    removeInlineTextEdit,
     setFormField,
     setScale,
     // Alias for zoom hook compatibility

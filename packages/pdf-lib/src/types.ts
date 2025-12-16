@@ -157,6 +157,20 @@ export interface RedactionAnnotation {
   enabled: boolean;
 }
 
+// Inline text edit for non-flattened PDFs
+export interface InlineTextEdit {
+  id: string;
+  page: number;
+  // Position and dimensions of the original text
+  rect: AnnotationRect;
+  // Original text content
+  originalText: string;
+  // New text content after editing
+  newText: string;
+  // Approximate font size (derived from rect height)
+  fontSize: number;
+}
+
 export type FieldValue = string | boolean;
 
 export interface EditorState {

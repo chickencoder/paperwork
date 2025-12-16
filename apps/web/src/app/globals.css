@@ -228,6 +228,23 @@ html:not(.safari) .overscroll-none-safe {
   pointer-events: auto !important;
 }
 
+/* Editable text spans in non-flattened PDFs */
+.textLayer span[contenteditable="true"] {
+  cursor: text !important;
+  outline: none;
+  border-radius: 2px;
+  transition: background-color 0.15s ease;
+}
+
+.textLayer span[contenteditable="true"]:hover {
+  background-color: oklch(0.9 0.1 230 / 0.3);
+}
+
+.textLayer span[contenteditable="true"]:focus {
+  background-color: oklch(0.9 0.15 60 / 0.5);
+  box-shadow: 0 0 0 2px oklch(0.7 0.15 60 / 0.3);
+}
+
 /* Grid background pattern for paper effect */
 .bg-grid-pattern {
   background-image: linear-gradient(

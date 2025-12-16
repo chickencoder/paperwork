@@ -76,6 +76,7 @@ export function PDFEditor({
     addShapeAnnotation,
     updateShapeAnnotation,
     removeShapeAnnotation,
+    addInlineTextEdit,
     setActiveTool,
     setActiveShapeType,
     selectAnnotation,
@@ -496,6 +497,7 @@ export function PDFEditor({
         state.strikethroughAnnotations,
         state.redactionAnnotations,
         state.shapeAnnotations,
+        state.inlineTextEdits,
         options.rasterize ? { rasterize: true } : undefined
       );
 
@@ -524,7 +526,7 @@ export function PDFEditor({
         URL.revokeObjectURL(url);
       }
     }
-  }, [state.pdfBytes, state.textAnnotations, state.signatureAnnotations, state.highlightAnnotations, state.strikethroughAnnotations, state.redactionAnnotations, state.shapeAnnotations, file.name]);
+  }, [state.pdfBytes, state.textAnnotations, state.signatureAnnotations, state.highlightAnnotations, state.strikethroughAnnotations, state.redactionAnnotations, state.shapeAnnotations, state.inlineTextEdits, file.name]);
 
   // Check if there are any enabled redactions
   const hasRedactions = state.redactionAnnotations.some(r => r.enabled);
@@ -621,6 +623,7 @@ export function PDFEditor({
           strikethroughAnnotations={state.strikethroughAnnotations}
           redactionAnnotations={state.redactionAnnotations}
           shapeAnnotations={state.shapeAnnotations}
+          inlineTextEdits={state.inlineTextEdits}
           activeTool={state.activeTool}
           activeShapeType={state.activeShapeType}
           selectedAnnotationId={state.selectedAnnotationId}
@@ -641,6 +644,7 @@ export function PDFEditor({
           onSelectAnnotation={selectAnnotation}
           onSignaturePlaced={handleSignaturePlaced}
           onFormFieldChange={handleFormFieldChange}
+          onInlineTextEdit={addInlineTextEdit}
           onDocumentLoad={setTotalPages}
           onCurrentPageChange={setCurrentPage}
         />
