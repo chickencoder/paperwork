@@ -596,116 +596,91 @@ export const TextReplacementOverlay = memo(function TextReplacementOverlay({
         </div>
       )}
 
-      {/* Resize handles - only show when selected */}
+      {/* Resize handles - only show when selected (matches shape annotation style) */}
       {isSelected && !isEditing && (
         <>
-          {/* Edge handles */}
-          <div
-            className="absolute cursor-w-resize"
-            style={{
-              left: -3,
-              top: "25%",
-              width: 6,
-              height: "50%",
-              background: "transparent",
-            }}
-            onMouseDown={(e) => handleResizeStart(e, "left")}
-          >
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-6 bg-ring rounded-full opacity-60 hover:opacity-100 transition-opacity" />
-          </div>
-          <div
-            className="absolute cursor-e-resize"
-            style={{
-              right: -3,
-              top: "25%",
-              width: 6,
-              height: "50%",
-              background: "transparent",
-            }}
-            onMouseDown={(e) => handleResizeStart(e, "right")}
-          >
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-6 bg-ring rounded-full opacity-60 hover:opacity-100 transition-opacity" />
-          </div>
-          <div
-            className="absolute cursor-n-resize"
-            style={{
-              top: -3,
-              left: "25%",
-              width: "50%",
-              height: 6,
-              background: "transparent",
-            }}
-            onMouseDown={(e) => handleResizeStart(e, "top")}
-          >
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-1.5 bg-ring rounded-full opacity-60 hover:opacity-100 transition-opacity" />
-          </div>
-          <div
-            className="absolute cursor-s-resize"
-            style={{
-              bottom: -3,
-              left: "25%",
-              width: "50%",
-              height: 6,
-              background: "transparent",
-            }}
-            onMouseDown={(e) => handleResizeStart(e, "bottom")}
-          >
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-1.5 bg-ring rounded-full opacity-60 hover:opacity-100 transition-opacity" />
-          </div>
-
           {/* Corner handles */}
           <div
-            className="absolute cursor-nw-resize"
-            style={{
-              left: -4,
-              top: -4,
-              width: 8,
-              height: 8,
-              background: "transparent",
-            }}
             onMouseDown={(e) => handleResizeStart(e, "top-left")}
-          >
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-ring rounded-full opacity-60 hover:opacity-100 transition-opacity" />
-          </div>
+            className={cn(
+              "absolute w-3 h-3 rounded-full",
+              "bg-primary hover:bg-primary/80",
+              "border-2 border-white shadow",
+              "cursor-nwse-resize"
+            )}
+            style={{ top: -6 / cssScale, left: -6 / cssScale, transform: `scale(${1 / cssScale})`, transformOrigin: "center center" }}
+          />
           <div
-            className="absolute cursor-ne-resize"
-            style={{
-              right: -4,
-              top: -4,
-              width: 8,
-              height: 8,
-              background: "transparent",
-            }}
             onMouseDown={(e) => handleResizeStart(e, "top-right")}
-          >
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-ring rounded-full opacity-60 hover:opacity-100 transition-opacity" />
-          </div>
+            className={cn(
+              "absolute w-3 h-3 rounded-full",
+              "bg-primary hover:bg-primary/80",
+              "border-2 border-white shadow",
+              "cursor-nesw-resize"
+            )}
+            style={{ top: -6 / cssScale, right: -6 / cssScale, transform: `scale(${1 / cssScale})`, transformOrigin: "center center" }}
+          />
           <div
-            className="absolute cursor-sw-resize"
-            style={{
-              left: -4,
-              bottom: -4,
-              width: 8,
-              height: 8,
-              background: "transparent",
-            }}
             onMouseDown={(e) => handleResizeStart(e, "bottom-left")}
-          >
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-ring rounded-full opacity-60 hover:opacity-100 transition-opacity" />
-          </div>
+            className={cn(
+              "absolute w-3 h-3 rounded-full",
+              "bg-primary hover:bg-primary/80",
+              "border-2 border-white shadow",
+              "cursor-nesw-resize"
+            )}
+            style={{ bottom: -6 / cssScale, left: -6 / cssScale, transform: `scale(${1 / cssScale})`, transformOrigin: "center center" }}
+          />
           <div
-            className="absolute cursor-se-resize"
-            style={{
-              right: -4,
-              bottom: -4,
-              width: 8,
-              height: 8,
-              background: "transparent",
-            }}
             onMouseDown={(e) => handleResizeStart(e, "bottom-right")}
-          >
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-ring rounded-full opacity-60 hover:opacity-100 transition-opacity" />
-          </div>
+            className={cn(
+              "absolute w-3 h-3 rounded-full",
+              "bg-primary hover:bg-primary/80",
+              "border-2 border-white shadow",
+              "cursor-nwse-resize"
+            )}
+            style={{ bottom: -6 / cssScale, right: -6 / cssScale, transform: `scale(${1 / cssScale})`, transformOrigin: "center center" }}
+          />
+          {/* Edge handles */}
+          <div
+            onMouseDown={(e) => handleResizeStart(e, "top")}
+            className={cn(
+              "absolute w-3 h-3 rounded-full",
+              "bg-primary hover:bg-primary/80",
+              "border-2 border-white shadow",
+              "cursor-ns-resize"
+            )}
+            style={{ top: -6 / cssScale, left: "50%", transform: `translateX(-50%) scale(${1 / cssScale})`, transformOrigin: "center center" }}
+          />
+          <div
+            onMouseDown={(e) => handleResizeStart(e, "bottom")}
+            className={cn(
+              "absolute w-3 h-3 rounded-full",
+              "bg-primary hover:bg-primary/80",
+              "border-2 border-white shadow",
+              "cursor-ns-resize"
+            )}
+            style={{ bottom: -6 / cssScale, left: "50%", transform: `translateX(-50%) scale(${1 / cssScale})`, transformOrigin: "center center" }}
+          />
+          <div
+            onMouseDown={(e) => handleResizeStart(e, "left")}
+            className={cn(
+              "absolute w-3 h-3 rounded-full",
+              "bg-primary hover:bg-primary/80",
+              "border-2 border-white shadow",
+              "cursor-ew-resize"
+            )}
+            style={{ top: "50%", left: -6 / cssScale, transform: `translateY(-50%) scale(${1 / cssScale})`, transformOrigin: "center center" }}
+          />
+          <div
+            onMouseDown={(e) => handleResizeStart(e, "right")}
+            className={cn(
+              "absolute w-3 h-3 rounded-full",
+              "bg-primary hover:bg-primary/80",
+              "border-2 border-white shadow",
+              "cursor-ew-resize"
+            )}
+            style={{ top: "50%", right: -6 / cssScale, transform: `translateY(-50%) scale(${1 / cssScale})`, transformOrigin: "center center" }}
+          />
         </>
       )}
 
