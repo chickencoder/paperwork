@@ -3,13 +3,17 @@
 import { useState, useEffect, useRef, useCallback, memo } from "react";
 import { Trash2, Bold, Italic, Minus, Plus, AlignLeft, AlignCenter, AlignRight, ChevronDown, Type, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { TextReplacementAnnotation, TextAnnotationColor, FontFamily } from "@paperwork/pdf-lib";
+import type { TextReplacementAnnotation, TextAnnotationColor, FontFamily, AnnotationRect } from "@paperwork/pdf-lib";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+
+// Minimum size for resize handles
+const MIN_WIDTH = 20;
+const MIN_HEIGHT = 10;
 
 // Color palette for text annotations - organized by groups
 const TEXT_COLOR_OPTIONS: { color: TextAnnotationColor; hex: string; label: string }[] = [
@@ -184,11 +188,14 @@ export const TextReplacementOverlay = memo(function TextReplacementOverlay({
   // The first rect is where we position the text input
   const firstRect = whiteoutRects[0];
 
-  // Track minimum width based on text content (applies to first rect only)
-  const [minWidth, setMinWidth] = useState(firstRect.width);
+  // Track if user has manually resized (to prevent auto-resize from overriding)
+  const [userResized, setUserResized] = useState(false);
 
-  // Measure text width and expand first rect if needed
+  // Measure text width and adjust first rect width accordingly
   const measureTextWidth = useCallback(() => {
+    // Don't auto-resize if user has manually resized
+    if (userResized) return;
+
     // Create a temporary span to measure text width
     const span = document.createElement("span");
     span.style.visibility = "hidden";
@@ -204,21 +211,120 @@ export const TextReplacementOverlay = memo(function TextReplacementOverlay({
     const textWidth = span.offsetWidth + 8; // Add small padding
     document.body.removeChild(span);
 
-    // Only expand, never shrink below original
-    const newMinWidth = Math.max(firstRect.width, textWidth / scale);
-    if (newMinWidth > minWidth) {
-      setMinWidth(newMinWidth);
-      // Update the first whiteout rect width
+    // Calculate required width (minimum MIN_WIDTH)
+    const requiredWidth = Math.max(MIN_WIDTH, textWidth / scale);
+
+    // Update if width needs to change
+    if (Math.abs(requiredWidth - firstRect.width) > 1) {
       const updatedRects = [...whiteoutRects];
-      updatedRects[0] = { ...firstRect, width: newMinWidth };
+      updatedRects[0] = { ...firstRect, width: requiredWidth };
       onUpdate({ whiteoutRects: updatedRects });
     }
-  }, [annotation.replacementText, annotation.fontSize, annotation.fontWeight, fontStyle, fontFamily, scale, minWidth, firstRect, whiteoutRects, onUpdate]);
+  }, [annotation.replacementText, annotation.fontSize, annotation.fontWeight, fontStyle, fontFamily, scale, firstRect, whiteoutRects, onUpdate, userResized]);
 
   // Measure text width when text changes
   useEffect(() => {
     measureTextWidth();
   }, [annotation.replacementText, measureTextWidth]);
+
+  // Resize handling
+  const [isResizing, setIsResizing] = useState(false);
+  const resizeRef = useRef<{
+    edge: "left" | "right" | "top" | "bottom" | "top-left" | "top-right" | "bottom-left" | "bottom-right";
+    startX: number;
+    startY: number;
+    startRects: AnnotationRect[];
+  } | null>(null);
+
+  const handleResizeStart = useCallback((
+    e: React.MouseEvent,
+    edge: "left" | "right" | "top" | "bottom" | "top-left" | "top-right" | "bottom-left" | "bottom-right"
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsResizing(true);
+    setUserResized(true); // Mark as manually resized
+    resizeRef.current = {
+      edge,
+      startX: e.clientX,
+      startY: e.clientY,
+      startRects: whiteoutRects.map(r => ({ ...r })),
+    };
+  }, [whiteoutRects]);
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!resizeRef.current) return;
+
+      const { edge, startX, startY, startRects } = resizeRef.current;
+      const deltaX = (e.clientX - startX) / scale;
+      const deltaY = (e.clientY - startY) / scale;
+
+      const updatedRects = startRects.map((rect, index) => {
+        const newRect = { ...rect };
+
+        // For simplicity, resize all rects proportionally
+        // Left edge: move x and reduce width
+        if (edge === "left" || edge === "top-left" || edge === "bottom-left") {
+          const newX = rect.x + deltaX;
+          const newWidth = rect.width - deltaX;
+          if (newWidth >= MIN_WIDTH) {
+            newRect.x = newX;
+            newRect.width = newWidth;
+          }
+        }
+
+        // Right edge: increase width
+        if (edge === "right" || edge === "top-right" || edge === "bottom-right") {
+          const newWidth = rect.width + deltaX;
+          if (newWidth >= MIN_WIDTH) {
+            newRect.width = newWidth;
+          }
+        }
+
+        // Top edge: move y and reduce height (only for first rect or all)
+        if (edge === "top" || edge === "top-left" || edge === "top-right") {
+          if (index === 0) {
+            const newY = rect.y + deltaY;
+            const newHeight = rect.height - deltaY;
+            if (newHeight >= MIN_HEIGHT) {
+              newRect.y = newY;
+              newRect.height = newHeight;
+            }
+          }
+        }
+
+        // Bottom edge: increase height (only for last rect)
+        if (edge === "bottom" || edge === "bottom-left" || edge === "bottom-right") {
+          if (index === startRects.length - 1) {
+            const newHeight = rect.height + deltaY;
+            if (newHeight >= MIN_HEIGHT) {
+              newRect.height = newHeight;
+            }
+          }
+        }
+
+        return newRect;
+      });
+
+      onUpdate({ whiteoutRects: updatedRects });
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      resizeRef.current = null;
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isResizing, scale, onUpdate]);
 
   return (
     <div
@@ -488,6 +594,119 @@ export const TextReplacementOverlay = memo(function TextReplacementOverlay({
             <Trash2 className="w-4 h-4" />
           </button>
         </div>
+      )}
+
+      {/* Resize handles - only show when selected */}
+      {isSelected && !isEditing && (
+        <>
+          {/* Edge handles */}
+          <div
+            className="absolute cursor-w-resize"
+            style={{
+              left: -3,
+              top: "25%",
+              width: 6,
+              height: "50%",
+              background: "transparent",
+            }}
+            onMouseDown={(e) => handleResizeStart(e, "left")}
+          >
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-6 bg-ring rounded-full opacity-60 hover:opacity-100 transition-opacity" />
+          </div>
+          <div
+            className="absolute cursor-e-resize"
+            style={{
+              right: -3,
+              top: "25%",
+              width: 6,
+              height: "50%",
+              background: "transparent",
+            }}
+            onMouseDown={(e) => handleResizeStart(e, "right")}
+          >
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-6 bg-ring rounded-full opacity-60 hover:opacity-100 transition-opacity" />
+          </div>
+          <div
+            className="absolute cursor-n-resize"
+            style={{
+              top: -3,
+              left: "25%",
+              width: "50%",
+              height: 6,
+              background: "transparent",
+            }}
+            onMouseDown={(e) => handleResizeStart(e, "top")}
+          >
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-1.5 bg-ring rounded-full opacity-60 hover:opacity-100 transition-opacity" />
+          </div>
+          <div
+            className="absolute cursor-s-resize"
+            style={{
+              bottom: -3,
+              left: "25%",
+              width: "50%",
+              height: 6,
+              background: "transparent",
+            }}
+            onMouseDown={(e) => handleResizeStart(e, "bottom")}
+          >
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-1.5 bg-ring rounded-full opacity-60 hover:opacity-100 transition-opacity" />
+          </div>
+
+          {/* Corner handles */}
+          <div
+            className="absolute cursor-nw-resize"
+            style={{
+              left: -4,
+              top: -4,
+              width: 8,
+              height: 8,
+              background: "transparent",
+            }}
+            onMouseDown={(e) => handleResizeStart(e, "top-left")}
+          >
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-ring rounded-full opacity-60 hover:opacity-100 transition-opacity" />
+          </div>
+          <div
+            className="absolute cursor-ne-resize"
+            style={{
+              right: -4,
+              top: -4,
+              width: 8,
+              height: 8,
+              background: "transparent",
+            }}
+            onMouseDown={(e) => handleResizeStart(e, "top-right")}
+          >
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-ring rounded-full opacity-60 hover:opacity-100 transition-opacity" />
+          </div>
+          <div
+            className="absolute cursor-sw-resize"
+            style={{
+              left: -4,
+              bottom: -4,
+              width: 8,
+              height: 8,
+              background: "transparent",
+            }}
+            onMouseDown={(e) => handleResizeStart(e, "bottom-left")}
+          >
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-ring rounded-full opacity-60 hover:opacity-100 transition-opacity" />
+          </div>
+          <div
+            className="absolute cursor-se-resize"
+            style={{
+              right: -4,
+              bottom: -4,
+              width: 8,
+              height: 8,
+              background: "transparent",
+            }}
+            onMouseDown={(e) => handleResizeStart(e, "bottom-right")}
+          >
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-ring rounded-full opacity-60 hover:opacity-100 transition-opacity" />
+          </div>
+        </>
       )}
 
       {/* Text content - positioned at the first whiteout rect */}
