@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import { ThemeProvider } from "next-themes";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { ConvexClientProvider } from "@/components/convex-client-provider";
@@ -118,6 +119,7 @@ export default function RootLayout({
             <NuqsAdapter>{children}</NuqsAdapter>
           </ConvexClientProvider>
         </ThemeProvider>
+        <Analytics />
       </body>
     </html>
   );
