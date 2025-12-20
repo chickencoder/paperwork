@@ -31,3 +31,7 @@ export type { ExtractedFormValues } from "./form-extractor";
 // Field Mapper
 export { pdfToScreen, screenToPdf } from "./field-mapper";
 export type { PageDimensions } from "./field-mapper";
+
+// PDF Metadata
+export { extractPDFMetadata, formatMetadataSummary } from "./pdf-metadata";
+export type { PDFMetadata } from "./pdf-metadata";

@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { cn } from "@paperwork/ui/utils";
 
 // Default US Letter page size (612x792 points at 72 DPI)
 const DEFAULT_PAGE_WIDTH = 612;

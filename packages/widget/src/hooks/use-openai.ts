@@ -30,7 +30,7 @@ export function useOpenAI() {
 }
 
 /**
- * Hook to access tool output from MCP server
+ * Hook to access tool output from MCP server (structuredContent)
  */
 export function useToolOutput(): ToolOutput | undefined {
   const openai = useOpenAI();
@@ -126,6 +126,96 @@ export function useFileUpload() {
         return null;
       }
       return openai.uploadFile(file);
+    },
+    [openai]
+  );
+}
+
+/**
+ * Hook to get file download URL from ChatGPT
+ */
+export function useGetFileDownloadUrl() {
+  const openai = useOpenAI();
+
+  return useCallback(
+    async (fileId: string): Promise<string | null> => {
+      if (!openai?.getFileDownloadUrl) {
+        console.warn("window.openai.getFileDownloadUrl not available");
+        return null;
+      }
+      return openai.getFileDownloadUrl({ fileId });
+    },
+    [openai]
+  );
+}
+
+/**
+ * Hook to get and set display mode (inline, pip, fullscreen)
+ */
+export function useDisplayMode() {
+  const openai = useOpenAI();
+  const sdkDisplayMode = openai?.displayMode;
+
+  // Track local state for immediate UI response (and fallback when SDK unavailable)
+  const [localFullscreen, setLocalFullscreen] = useState(false);
+
+  // Sync local state with SDK when available
+  useEffect(() => {
+    if (sdkDisplayMode !== undefined) {
+      setLocalFullscreen(sdkDisplayMode === "fullscreen");
+    }
+  }, [sdkDisplayMode]);
+
+  const displayMode = sdkDisplayMode ?? (localFullscreen ? "fullscreen" : "inline");
+
+  const requestDisplayMode = useCallback(
+    async (mode: "inline" | "pip" | "fullscreen") => {
+      // Update local state immediately for responsive UI
+      setLocalFullscreen(mode === "fullscreen");
+
+      if (!openai?.requestDisplayMode) {
+        // Fallback: just use local state when SDK unavailable
+        return;
+      }
+      await openai.requestDisplayMode({ mode });
+    },
+    [openai]
+  );
+
+  const toggleFullscreen = useCallback(async () => {
+    const newMode = displayMode === "fullscreen" ? "inline" : "fullscreen";
+    await requestDisplayMode(newMode);
+  }, [displayMode, requestDisplayMode]);
+
+  return {
+    displayMode,
+    requestDisplayMode,
+    toggleFullscreen,
+    isFullscreen: displayMode === "fullscreen",
+  };
+}
+
+/**
+ * Hook to get max height from ChatGPT
+ */
+export function useMaxHeight(): number | undefined {
+  const openai = useOpenAI();
+  return openai?.maxHeight;
+}
+
+/**
+ * Hook to send a follow-up message to the AI conversation
+ */
+export function useSendFollowUpMessage() {
+  const openai = useOpenAI();
+
+  return useCallback(
+    (prompt: string) => {
+      if (!openai?.sendFollowUpMessage) {
+        console.warn("window.openai.sendFollowUpMessage not available");
+        return;
+      }
+      openai.sendFollowUpMessage({ prompt });
     },
     [openai]
   );

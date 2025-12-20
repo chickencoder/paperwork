@@ -7,7 +7,7 @@ import type {
   RedactionAnnotation,
   ShapeAnnotation,
   ShapeType,
-} from "@/lib/pdf/types";
+} from "@paperwork/pdf-lib/types";
 
 // History configuration
 const MAX_HISTORY_LENGTH = 50;

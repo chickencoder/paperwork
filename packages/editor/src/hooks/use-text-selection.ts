@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, type RefObject } from "react";
-import type { AnnotationRect } from "@/lib/pdf/types";
+import type { AnnotationRect } from "@paperwork/pdf-lib/types";
 
 export interface TextSelection {
   text: string;

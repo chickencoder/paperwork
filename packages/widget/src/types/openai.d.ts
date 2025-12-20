@@ -31,13 +31,7 @@ export interface OpenAIWidget {
   notifyIntrinsicHeight: (height: number) => void;
 }
 
-export interface ToolOutput {
-  mode?: "upload" | "edit" | "sign" | "annotate";
-  file_url?: string;
-  file_id?: string;
-  capabilities?: string[];
-  supportedFormats?: string[];
-  maxFileSize?: string;
-}
+// Tool output structure from MCP tools
+export type ToolOutput = Record<string, unknown>;
 
 export {};

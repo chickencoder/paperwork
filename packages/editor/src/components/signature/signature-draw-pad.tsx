@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useCallback, useState } from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "@paperwork/ui/utils";
 
 interface SignatureDrawPadProps {
   onSignatureChange: (dataUrl: string | null) => void;

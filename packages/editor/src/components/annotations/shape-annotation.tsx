@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback, memo } from "react";
 import { Trash2, Minus, Plus, RotateCw } from "lucide-react";
-import { cn } from "@/lib/utils";
-import type { ShapeAnnotation, ShapeColor } from "@/lib/pdf/types";
+import { cn } from "@paperwork/ui/utils";
+import type { ShapeAnnotation, ShapeColor } from "@paperwork/pdf-lib/types";
 
 // Color palette for shape annotations - includes transparent
 const SHAPE_COLOR_OPTIONS: { color: ShapeColor; hex: string; label: string }[] = [

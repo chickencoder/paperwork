@@ -4,8 +4,8 @@ import {
   clearSession,
   type PersistedSession,
   type PersistedTab,
-} from "@/lib/storage/persistence";
-import type { MultiDocumentState, TabId } from "@/hooks/use-multi-document-state";
+} from "../stubs/storage";
+import type { MultiDocumentState, TabId } from "./use-multi-document-state";
 
 interface UsePersistenceOptions {
   debounceMs?: number;

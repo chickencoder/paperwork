@@ -2,8 +2,8 @@
 
 import { useState, useRef, useEffect, memo } from "react";
 import { Trash2 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import type { RedactionAnnotation } from "@/lib/pdf/types";
+import { cn } from "@paperwork/ui/utils";
+import type { RedactionAnnotation } from "@paperwork/pdf-lib/types";
 
 interface RedactionOverlayProps {
   annotation: RedactionAnnotation;

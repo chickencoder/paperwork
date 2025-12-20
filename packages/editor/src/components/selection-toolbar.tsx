@@ -2,14 +2,14 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Highlighter, Strikethrough, ChevronDown, EyeOff } from "lucide-react";
-import { cn } from "@/lib/utils";
-import type { HighlightColor, StrikethroughColor } from "@/lib/pdf/types";
+import { cn } from "@paperwork/ui/utils";
+import type { HighlightColor, StrikethroughColor } from "@paperwork/pdf-lib/types";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@paperwork/ui/tooltip";
 
 // Note: These are intentionally hardcoded Tailwind colors for the highlighting feature
 // They represent specific highlight marker colors, not design system colors

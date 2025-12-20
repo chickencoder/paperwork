@@ -2,8 +2,8 @@
 
 import { useState, useRef, useEffect, memo } from "react";
 import { Trash2 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import type { HighlightAnnotation, HighlightColor } from "@/lib/pdf/types";
+import { cn } from "@paperwork/ui/utils";
+import type { HighlightAnnotation, HighlightColor } from "@paperwork/pdf-lib/types";
 
 const COLOR_MAP: Record<HighlightColor, string> = {
   yellow: "bg-yellow-300/50",

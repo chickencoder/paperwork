@@ -7,7 +7,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from "@paperwork/ui/alert-dialog";
 
 interface CloseTabDialogProps {
   open: boolean;

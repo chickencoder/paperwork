@@ -20,7 +20,10 @@
   "dependencies": {
     "@paperwork/pdf-lib": "workspace:*",
     "@paperwork/ui": "workspace:*",
+    "framer-motion": "^12.18.1",
+    "lucide-react": "^0.555.0",
     "nanoid": "^5.1.6",
+    "nuqs": "^2.4.2",
     "react-pdf": "^10.2.0"
   },
   "peerDependencies": {

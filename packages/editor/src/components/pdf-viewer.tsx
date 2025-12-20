@@ -5,7 +5,7 @@ import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import { Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "@paperwork/ui/utils";
 import type {
   TextAnnotation,
   SignatureAnnotation,
@@ -14,7 +14,7 @@ import type {
   RedactionAnnotation,
   ShapeAnnotation,
   ShapeType,
-} from "@/lib/pdf/types";
+} from "@paperwork/pdf-lib/types";
 import { TextAnnotationOverlay } from "./fields/text-annotation";
 import { SignatureAnnotationOverlay } from "./fields/signature-annotation";
 import { HighlightOverlay } from "./annotations/highlight-overlay";
@@ -22,7 +22,7 @@ import { StrikethroughOverlay } from "./annotations/strikethrough-overlay";
 import { RedactionOverlay } from "./annotations/redaction-overlay";
 import { ShapeAnnotationOverlay, getShapeColorHex } from "./annotations/shape-annotation";
 import { PageSkeleton } from "./page-skeleton";
-import { useVirtualizedPages } from "@/hooks/use-virtualized-pages";
+import { useVirtualizedPages } from "../hooks/use-virtualized-pages";
 
 // Configure PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;

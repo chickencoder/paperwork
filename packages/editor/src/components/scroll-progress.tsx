@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { cn } from "@paperwork/ui/utils";
 
 interface ScrollProgressProps {
   progress: number;

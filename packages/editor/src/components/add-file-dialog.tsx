@@ -9,9 +9,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+} from "@paperwork/ui/dialog";
+import { Button } from "@paperwork/ui/button";
+import { cn } from "@paperwork/ui/utils";
 
 interface MergeSource {
   file: File;

@@ -2,8 +2,8 @@
 
 import { useState, useCallback } from "react";
 import { X, Plus } from "lucide-react";
-import { cn } from "@/lib/utils";
-import type { DocumentTab, TabId } from "@/hooks/use-multi-document-state";
+import { cn } from "@paperwork/ui/utils";
+import type { DocumentTab, TabId } from "../hooks/use-multi-document-state";
 
 interface TabBarProps {
   tabs: DocumentTab[];

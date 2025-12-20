@@ -22,28 +22,28 @@ import {
   Hexagon,
   MessageSquare,
 } from "lucide-react";
-import type { ShapeType } from "@/lib/pdf/types";
-import { cn } from "@/lib/utils";
+import type { ShapeType } from "@paperwork/pdf-lib/types";
+import { cn } from "@paperwork/ui/utils";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
+} from "@paperwork/ui/popover";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@paperwork/ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Switch } from "@/components/ui/switch";
+} from "@paperwork/ui/dropdown-menu";
+import { Switch } from "@paperwork/ui/switch";
 import { SignaturePopover } from "./signature/signature-popover";
-import { MicroAppCombobox, MicroApp } from "@/components/micro-apps";
+import { MicroAppCombobox, type MicroApp } from "../stubs/micro-apps";
 
 // Shape type options with icons and labels
 const SHAPE_OPTIONS: { type: ShapeType; icon: React.ReactNode; label: string }[] = [
@@ -67,6 +67,8 @@ interface ToolbarProps {
   canRedo: boolean;
   hasRedactions: boolean;
   hasTabBar?: boolean;
+  /** Hides the micro-apps (Tools) menu */
+  hideMicroApps?: boolean;
   isEntering?: boolean;
   onUndo: () => void;
   onRedo: () => void;
@@ -89,6 +91,7 @@ export function Toolbar({
   canRedo,
   hasRedactions,
   hasTabBar = false,
+  hideMicroApps = false,
   isEntering = false,
   onUndo,
   onRedo,
@@ -207,13 +210,16 @@ export function Toolbar({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Divider />
-
-          {/* Micro Apps */}
-          <MicroAppCombobox
-            onSelect={(app) => onMicroAppSelect?.(app)}
-            hasDocument={true}
-          />
+          {/* Micro Apps (hidden in widget mode) */}
+          {!hideMicroApps && (
+            <>
+              <Divider />
+              <MicroAppCombobox
+                onSelect={(app) => onMicroAppSelect?.(app)}
+                hasDocument={true}
+              />
+            </>
+          )}
 
           <Divider />
 

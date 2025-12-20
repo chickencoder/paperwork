@@ -1,15 +1,34 @@
 import { Hono } from "hono";
-import { handle } from "hono/vercel";
 import { cors } from "hono/cors";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPTransport } from "@hono/mcp";
-import { z } from "zod";
+import { readFileSync, existsSync } from "fs";
+import { fileURLToPath } from "url";
 
 // Widget HTML - bundled at build time or fetched from URL
 const WIDGET_URI = "ui://paperwork/editor.html";
 
-// For Vercel deployment, widget HTML should be set via environment variable
-const FALLBACK_WIDGET_HTML = `
+// Try to load widget HTML from built file or environment variable
+function getWidgetHTML(): string {
+  // First check environment variable (for Vercel production)
+  if (process.env.WIDGET_HTML) {
+    return process.env.WIDGET_HTML;
+  }
+
+  // In development, read from the @paperwork/widget package
+  try {
+    // Resolve the widget package path using import.meta.resolve
+    const widgetHtmlUrl = import.meta.resolve("@paperwork/widget/dist/index.html");
+    const widgetPath = fileURLToPath(widgetHtmlUrl);
+    if (existsSync(widgetPath)) {
+      return readFileSync(widgetPath, "utf-8");
+    }
+  } catch {
+    // Ignore errors, fall through to fallback
+  }
+
+  // Fallback
+  return `
 <!DOCTYPE html>
 <html>
 <head>
@@ -35,14 +54,11 @@ const FALLBACK_WIDGET_HTML = `
 <body>
   <div class="container">
     <h1>Paperwork PDF Editor</h1>
-    <p>Widget not configured.</p>
+    <p>Widget not configured. Build the widget first: pnpm --filter @paperwork/widget build</p>
   </div>
 </body>
 </html>
 `.trim();
-
-function getWidgetHTML(): string {
-  return process.env.WIDGET_HTML ?? FALLBACK_WIDGET_HTML;
 }
 
 // Create the MCP server with tools and resources
@@ -77,16 +93,13 @@ mcp.registerResource(
 );
 
 // Tool: open_pdf_editor
-// Opens the PDF editor widget for the user to upload and edit a PDF
-const OpenPdfEditorInputSchema = z.object({});
-
+// Opens the PDF editor widget - user uploads their PDF directly in the widget
 mcp.registerTool(
   "open_pdf_editor",
   {
     title: "Open PDF Editor",
     description:
-      "Opens the Paperwork PDF editor. Use this when the user wants to edit, annotate, sign, highlight, redact, or view a PDF. The user will upload their PDF in the editor.",
-    inputSchema: OpenPdfEditorInputSchema,
+      "Opens the Paperwork PDF editor. Use this when the user wants to edit, annotate, sign, highlight, redact, or view a PDF. The user will upload their PDF directly in the editor.",
     annotations: {
       readOnlyHint: false,
       destructiveHint: false,
@@ -103,10 +116,9 @@ mcp.registerTool(
       content: [
         {
           type: "text" as const,
-          text: "Opening PDF editor. The user can now upload a PDF to annotate, highlight, sign, and edit.",
+          text: "Opening PDF editor. Please upload your PDF to begin editing.",
         },
       ],
-      structuredContent: {},
     };
   }
 );
@@ -115,7 +127,7 @@ mcp.registerTool(
 const transport = new StreamableHTTPTransport();
 
 // Create Hono app
-const app = new Hono();
+export const app = new Hono();
 
 // CORS middleware
 app.use(
@@ -150,5 +162,3 @@ app.all("/mcp", async (c) => {
   }
   return transport.handleRequest(c);
 });
-
-export default app;

@@ -2,14 +2,14 @@
 
 import { useState, useEffect, useRef, useCallback, memo } from "react";
 import { Trash2, Bold, Italic, Minus, Plus, AlignLeft, AlignCenter, AlignRight, ChevronDown, Type, Check, RotateCw } from "lucide-react";
-import { cn } from "@/lib/utils";
-import type { TextAnnotation, TextAnnotationColor, FontFamily } from "@/lib/pdf/types";
+import { cn } from "@paperwork/ui/utils";
+import type { TextAnnotation, TextAnnotationColor, FontFamily } from "@paperwork/pdf-lib/types";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@paperwork/ui/dropdown-menu";
 
 // Color palette for text annotations - organized by groups
 const TEXT_COLOR_OPTIONS: { color: TextAnnotationColor; hex: string; label: string }[] = [

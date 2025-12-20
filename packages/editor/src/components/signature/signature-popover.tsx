@@ -2,19 +2,19 @@
 
 import { useState, useCallback } from "react";
 import { Pen, Type } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useIsMobile } from "@/hooks/use-is-mobile";
+import { cn } from "@paperwork/ui/utils";
+import { useIsMobile } from "@paperwork/ui/hooks/use-is-mobile";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
+} from "@paperwork/ui/popover";
 import {
   Drawer,
   DrawerContent,
   DrawerHeader,
   DrawerTitle,
-} from "@/components/ui/drawer";
+} from "@paperwork/ui/drawer";
 import { SignatureDrawPad } from "./signature-draw-pad";
 import { SignatureTypePad } from "./signature-type-pad";
 

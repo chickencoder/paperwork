@@ -7,7 +7,10 @@ export default defineConfig({
   plugins: [react(), viteSingleFile()],
   resolve: {
     alias: {
-      "@": resolve(__dirname, "./src"),
+      // Workspace package aliases
+      "@paperwork/editor": resolve(__dirname, "../editor/src"),
+      "@paperwork/ui": resolve(__dirname, "../ui/src"),
+      "@paperwork/pdf-lib": resolve(__dirname, "../pdf-lib/src"),
     },
   },
   build: {

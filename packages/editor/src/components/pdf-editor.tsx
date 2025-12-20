@@ -3,24 +3,28 @@
 import { useEffect, useCallback, useRef, useState } from "react";
 import { useQueryState, parseAsString } from "nuqs";
 import { motion } from "framer-motion";
-import { useEditorState, type EditorSnapshot } from "@/hooks/use-editor-state";
-import { useTextSelection } from "@/hooks/use-text-selection";
-import { useZoom } from "@/hooks/use-zoom";
-import { useScrollProgress } from "@/hooks/use-scroll-progress";
-import { modifyPDF } from "@/lib/pdf/pdf-modifier";
-import { extractFormValues } from "@/lib/pdf/form-extractor";
-import type { HighlightColor, StrikethroughColor } from "@/lib/pdf/types";
+import { useEditorState, type EditorSnapshot } from "../hooks/use-editor-state";
+import { useTextSelection } from "../hooks/use-text-selection";
+import { useZoom } from "../hooks/use-zoom";
+import { useScrollProgress } from "../hooks/use-scroll-progress";
+import { modifyPDF } from "@paperwork/pdf-lib/pdf-modifier";
+import { extractFormValues } from "@paperwork/pdf-lib/form-extractor";
+import type { HighlightColor, StrikethroughColor } from "@paperwork/pdf-lib/types";
 import { PDFViewer, type PDFViewerHandle } from "./pdf-viewer";
 import { Toolbar } from "./toolbar";
 import { MobileToolbar } from "./mobile-toolbar";
 import { SelectionToolbar } from "./selection-toolbar";
 import { ScrollProgress } from "./scroll-progress";
-import { CompressPdfWindow } from "@/components/micro-apps/windows/compress-pdf-window";
-import { UnlockPdfWindow } from "@/components/micro-apps/windows/unlock-pdf-window";
-import { FlattenPdfWindow } from "@/components/micro-apps/windows/flatten-pdf-window";
-import { SplitPdfWindow } from "@/components/micro-apps/windows/split-pdf-window";
-import { RotatePdfWindow } from "@/components/micro-apps/windows/rotate-pdf-window";
-import { OcrPdfWindow } from "@/components/micro-apps/windows/ocr-pdf-window";
+import {
+  CompressPdfWindow,
+  UnlockPdfWindow,
+  FlattenPdfWindow,
+  SplitPdfWindow,
+  RotatePdfWindow,
+  OcrPdfWindow,
+  type MicroApp,
+} from "../stubs/micro-apps";
+import type { TransitionState } from "../stubs/landing";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -29,9 +33,7 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogAction,
-} from "@/components/ui/alert-dialog";
-import type { MicroApp } from "@/components/micro-apps";
-import type { TransitionState } from "@/components/landing/landing-dialog";
+} from "@paperwork/ui/alert-dialog";
 
 interface PDFEditorProps {
   file: File;
@@ -41,6 +43,10 @@ interface PDFEditorProps {
   onFormValuesChange?: (values: Record<string, string | boolean>) => void;
   onAddTab?: (file: File, bytes: Uint8Array) => void;
   hasTabBar?: boolean;
+  /** Disables micro-apps menu and URL query state (for widget mode) */
+  disableMicroApps?: boolean;
+  /** Hides the toolbar completely (for viewer mode in widget) */
+  hideToolbar?: boolean;
   isEntering?: boolean;
   entryRect?: TransitionState["dialogRect"];
   onEnterComplete?: () => void;
@@ -54,6 +60,8 @@ export function PDFEditor({
   onFormValuesChange,
   onAddTab,
   hasTabBar = false,
+  disableMicroApps = false,
+  hideToolbar = false,
   isEntering = false,
   entryRect,
   onEnterComplete,
@@ -96,7 +104,11 @@ export function PDFEditor({
   const viewerContainerRef = useRef<HTMLDivElement | null>(null);
   const [isSignaturePopoverOpen, setIsSignaturePopoverOpen] = useState(false);
   const [pendingSignatureData, setPendingSignatureData] = useState<string | null>(null);
-  const [activeMicroApp, setActiveMicroApp] = useQueryState("tool", parseAsString);
+  // Use local state when micro-apps disabled (widget mode), URL query state otherwise
+  const [localMicroApp, setLocalMicroApp] = useState<string | null>(null);
+  const [queryMicroApp, setQueryMicroApp] = useQueryState("tool", parseAsString);
+  const activeMicroApp = disableMicroApps ? localMicroApp : queryMicroApp;
+  const setActiveMicroApp = disableMicroApps ? setLocalMicroApp : setQueryMicroApp;
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const mousePositionRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const clearSelectionRef = useRef<(() => void) | null>(null);
@@ -496,6 +508,7 @@ export function PDFEditor({
         state.strikethroughAnnotations,
         state.redactionAnnotations,
         state.shapeAnnotations,
+        [], // textReplacementAnnotations
         options.rasterize ? { rasterize: true } : undefined
       );
 
@@ -546,49 +559,55 @@ export function PDFEditor({
         totalPages={totalPages}
         hasTabBar={hasTabBar}
       />
-      <Toolbar
-        scale={effectiveScale}
-        activeTool={state.activeTool}
-        activeShapeType={state.activeShapeType}
-        fileName={file.name}
-        isSignaturePopoverOpen={isSignaturePopoverOpen}
-        canUndo={canUndo}
-        canRedo={canRedo}
-        hasRedactions={hasRedactions}
-        hasTabBar={hasTabBar}
-        isEntering={isEntering}
-        onUndo={handleUndo}
-        onRedo={handleRedo}
-        onZoomIn={zoomIn}
-        onZoomOut={zoomOut}
-        onToolChange={setActiveTool}
-        onShapeTypeChange={setActiveShapeType}
-        onSignaturePopoverChange={setIsSignaturePopoverOpen}
-        onSignatureCreated={handleSignatureCreated}
-        onDownload={handleDownload}
-        onMicroAppSelect={handleMicroAppSelect}
-      />
-      <MobileToolbar
-        scale={effectiveScale}
-        activeTool={state.activeTool}
-        activeShapeType={state.activeShapeType}
-        fileName={file.name}
-        isSignaturePopoverOpen={isSignaturePopoverOpen}
-        canUndo={canUndo}
-        canRedo={canRedo}
-        hasRedactions={hasRedactions}
-        hidden={!!activeMicroApp}
-        onUndo={handleUndo}
-        onRedo={handleRedo}
-        onZoomIn={zoomIn}
-        onZoomOut={zoomOut}
-        onToolChange={setActiveTool}
-        onShapeTypeChange={setActiveShapeType}
-        onSignaturePopoverChange={setIsSignaturePopoverOpen}
-        onSignatureCreated={handleSignatureCreated}
-        onDownload={handleDownload}
-        onMicroAppSelect={handleMicroAppSelect}
-      />
+      {!hideToolbar && (
+        <>
+          <Toolbar
+            scale={effectiveScale}
+            activeTool={state.activeTool}
+            activeShapeType={state.activeShapeType}
+            fileName={file.name}
+            isSignaturePopoverOpen={isSignaturePopoverOpen}
+            canUndo={canUndo}
+            canRedo={canRedo}
+            hasRedactions={hasRedactions}
+            hasTabBar={hasTabBar}
+            hideMicroApps={disableMicroApps}
+            isEntering={isEntering}
+            onUndo={handleUndo}
+            onRedo={handleRedo}
+            onZoomIn={zoomIn}
+            onZoomOut={zoomOut}
+            onToolChange={setActiveTool}
+            onShapeTypeChange={setActiveShapeType}
+            onSignaturePopoverChange={setIsSignaturePopoverOpen}
+            onSignatureCreated={handleSignatureCreated}
+            onDownload={handleDownload}
+            onMicroAppSelect={handleMicroAppSelect}
+          />
+          <MobileToolbar
+            scale={effectiveScale}
+            activeTool={state.activeTool}
+            activeShapeType={state.activeShapeType}
+            fileName={file.name}
+            isSignaturePopoverOpen={isSignaturePopoverOpen}
+            canUndo={canUndo}
+            canRedo={canRedo}
+            hasRedactions={hasRedactions}
+            hidden={!!activeMicroApp}
+            hideMicroApps={disableMicroApps}
+            onUndo={handleUndo}
+            onRedo={handleRedo}
+            onZoomIn={zoomIn}
+            onZoomOut={zoomOut}
+            onToolChange={setActiveTool}
+            onShapeTypeChange={setActiveShapeType}
+            onSignaturePopoverChange={setIsSignaturePopoverOpen}
+            onSignatureCreated={handleSignatureCreated}
+            onDownload={handleDownload}
+            onMicroAppSelect={handleMicroAppSelect}
+          />
+        </>
+      )}
 
       <motion.div
         className="px-4 pt-4 pb-8 md:pb-8 pb-24"
@@ -656,49 +675,53 @@ export function PDFEditor({
         />
       )}
 
-      {/* Micro-app windows */}
-      <CompressPdfWindow
-        open={activeMicroApp === "compress-pdf"}
-        onClose={() => setActiveMicroApp(null)}
-        pdfBytes={state.pdfBytes}
-        fileName={file.name}
-      />
-      <UnlockPdfWindow
-        open={activeMicroApp === "unlock-pdf"}
-        onClose={() => setActiveMicroApp(null)}
-        pdfBytes={state.pdfBytes}
-        fileName={file.name}
-      />
-      <FlattenPdfWindow
-        open={activeMicroApp === "flatten-pdf"}
-        onClose={() => setActiveMicroApp(null)}
-        pdfBytes={state.pdfBytes}
-        fileName={file.name}
-      />
-      <SplitPdfWindow
-        open={activeMicroApp === "split-pdf"}
-        onClose={() => setActiveMicroApp(null)}
-        pdfBytes={state.pdfBytes}
-        fileName={file.name}
-        onAddTab={onAddTab}
-      />
-      <RotatePdfWindow
-        open={activeMicroApp === "rotate-pdf"}
-        onClose={() => setActiveMicroApp(null)}
-        pdfBytes={state.pdfBytes}
-        fileName={file.name}
-        onApply={(newBytes) => {
-          // Create a new File object with the rotated bytes
-          const newFile = new File([new Uint8Array(newBytes)], file.name, { type: "application/pdf" });
-          setPdf(newFile, newBytes);
-        }}
-      />
-      <OcrPdfWindow
-        open={activeMicroApp === "ocr-pdf"}
-        onClose={() => setActiveMicroApp(null)}
-        pdfBytes={state.pdfBytes}
-        fileName={file.name}
-      />
+      {/* Micro-app windows (hidden in widget mode) */}
+      {!disableMicroApps && (
+        <>
+          <CompressPdfWindow
+            open={activeMicroApp === "compress-pdf"}
+            onClose={() => setActiveMicroApp(null)}
+            pdfBytes={state.pdfBytes}
+            fileName={file.name}
+          />
+          <UnlockPdfWindow
+            open={activeMicroApp === "unlock-pdf"}
+            onClose={() => setActiveMicroApp(null)}
+            pdfBytes={state.pdfBytes}
+            fileName={file.name}
+          />
+          <FlattenPdfWindow
+            open={activeMicroApp === "flatten-pdf"}
+            onClose={() => setActiveMicroApp(null)}
+            pdfBytes={state.pdfBytes}
+            fileName={file.name}
+          />
+          <SplitPdfWindow
+            open={activeMicroApp === "split-pdf"}
+            onClose={() => setActiveMicroApp(null)}
+            pdfBytes={state.pdfBytes}
+            fileName={file.name}
+            onAddTab={onAddTab}
+          />
+          <RotatePdfWindow
+            open={activeMicroApp === "rotate-pdf"}
+            onClose={() => setActiveMicroApp(null)}
+            pdfBytes={state.pdfBytes}
+            fileName={file.name}
+            onApply={(newBytes) => {
+              // Create a new File object with the rotated bytes
+              const newFile = new File([new Uint8Array(newBytes)], file.name, { type: "application/pdf" });
+              setPdf(newFile, newBytes);
+            }}
+          />
+          <OcrPdfWindow
+            open={activeMicroApp === "ocr-pdf"}
+            onClose={() => setActiveMicroApp(null)}
+            pdfBytes={state.pdfBytes}
+            fileName={file.name}
+          />
+        </>
+      )}
 
       {/* Download error dialog */}
       <AlertDialog open={!!downloadError} onOpenChange={(open) => !open && setDownloadError(null)}>

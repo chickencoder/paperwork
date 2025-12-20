@@ -1,12 +1,11 @@
 {
   "extends": "@paperwork/tsconfig/base.json",
   "compilerOptions": {
-    "outDir": "dist",
-    "rootDir": "src",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "target": "ES2022"
+    "target": "ES2022",
+    "noEmit": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "exclude": ["node_modules", ".vercel"]
 }

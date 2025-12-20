@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "exports": {
+    "./dist/index.html": "./dist/index.html"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
@@ -10,9 +13,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@paperwork/editor": "workspace:*",
     "@paperwork/pdf-lib": "workspace:*",
     "@paperwork/ui": "workspace:*",
     "lucide-react": "^0.555.0",
+    "nuqs": "^2.4.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-pdf": "^10.2.0"

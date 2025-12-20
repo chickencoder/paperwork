@@ -2,8 +2,8 @@
 
 import { useState, useRef, useEffect, memo } from "react";
 import { Trash2 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import type { StrikethroughAnnotation, StrikethroughColor } from "@/lib/pdf/types";
+import { cn } from "@paperwork/ui/utils";
+import type { StrikethroughAnnotation, StrikethroughColor } from "@paperwork/pdf-lib/types";
 
 const COLOR_MAP: Record<StrikethroughColor, { base: string; selected: string; hover: string }> = {
   red: { base: "bg-red-500", selected: "bg-red-600", hover: "bg-red-600" },

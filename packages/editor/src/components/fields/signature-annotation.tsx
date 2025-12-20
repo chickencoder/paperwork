@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback, memo } from "react";
 import { Trash2, RotateCw, ChevronDown } from "lucide-react";
-import { cn } from "@/lib/utils";
-import type { SignatureAnnotation, SignatureColor } from "@/lib/pdf/types";
+import { cn } from "@paperwork/ui/utils";
+import type { SignatureAnnotation, SignatureColor } from "@paperwork/pdf-lib/types";
 
 // Color options for signatures
 const SIGNATURE_COLOR_OPTIONS: { color: SignatureColor; hex: string; label: string }[] = [

@@ -7,7 +7,7 @@ import type {
   RedactionAnnotation,
   ShapeAnnotation,
   ShapeType,
-} from "@/lib/pdf/types";
+} from "@paperwork/pdf-lib/types";
 
 // Unique identifier for each tab/document session
 export type TabId = string;

@@ -22,22 +22,22 @@ import {
   Hexagon,
   MessageSquare,
 } from "lucide-react";
-import type { ShapeType } from "@/lib/pdf/types";
-import { cn } from "@/lib/utils";
+import type { ShapeType } from "@paperwork/pdf-lib/types";
+import { cn } from "@paperwork/ui/utils";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
-import { Switch } from "@/components/ui/switch";
+} from "@paperwork/ui/popover";
+import { Switch } from "@paperwork/ui/switch";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@paperwork/ui/dropdown-menu";
 import { SignaturePopover } from "./signature/signature-popover";
-import { MicroAppCombobox, MicroApp } from "@/components/micro-apps";
+import { MicroAppCombobox, type MicroApp } from "../stubs/micro-apps";
 
 // Shape type options with icons and labels
 const SHAPE_OPTIONS: { type: ShapeType; icon: React.ReactNode; label: string }[] = [
@@ -61,6 +61,8 @@ interface MobileToolbarProps {
   canRedo: boolean;
   hasRedactions: boolean;
   hidden?: boolean;
+  /** Hides the micro-apps (Tools) menu */
+  hideMicroApps?: boolean;
   onUndo: () => void;
   onRedo: () => void;
   onZoomIn: () => void;
@@ -82,6 +84,7 @@ export function MobileToolbar({
   canRedo,
   hasRedactions,
   hidden = false,
+  hideMicroApps = false,
   onUndo,
   onRedo,
   onZoomIn,
@@ -194,12 +197,14 @@ export function MobileToolbar({
               </DropdownMenu>
             </div>
 
-            {/* Micro Apps */}
-            <MicroAppCombobox
-              onSelect={(app) => onMicroAppSelect?.(app)}
-              hasDocument={true}
-              onOpenChange={handleToolsOpenChange}
-            />
+            {/* Micro Apps (hidden in widget mode) */}
+            {!hideMicroApps && (
+              <MicroAppCombobox
+                onSelect={(app) => onMicroAppSelect?.(app)}
+                hasDocument={true}
+                onOpenChange={handleToolsOpenChange}
+              />
+            )}
 
             {/* Zoom controls */}
             <div className="flex items-center gap-0.5">

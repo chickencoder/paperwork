@@ -4,20 +4,24 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "build": "tsc",
-    "start": "node dist/index.js",
+    "dev": "tsx watch --clear-screen=false src/dev.ts",
+    "dev:vercel": "vercel dev",
+    "build": "vercel build",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@hono/mcp": "^0.2.0",
+    "@hono/node-server": "^1.14.1",
     "@modelcontextprotocol/sdk": "^1.0.0",
-    "@paperwork/pdf-lib": "workspace:*",
+    "hono": "^4.7.0",
     "zod": "^3.24.0"
   },
   "devDependencies": {
     "@paperwork/tsconfig": "workspace:*",
+    "@paperwork/widget": "workspace:*",
     "@types/node": "^24.10.1",
     "tsx": "^4.19.0",
-    "typescript": "~5.9.3"
+    "typescript": "~5.9.3",
+    "vercel": "^40.1.0"
   }
 }

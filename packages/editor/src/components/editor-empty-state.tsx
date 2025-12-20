@@ -1,27 +1,32 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
 import { Upload } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Button } from "@/components/ui/button";
-import {
-  generateSessionId,
-  TransitionState,
-} from "@/components/landing/landing-dialog";
-import { savePendingPdf } from "@/lib/storage/persistence";
+import { Button } from "@paperwork/ui/button";
 
 const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024;
 const MAX_FILE_SIZE_MB = 100;
 
-export function EditorEmptyState() {
-  const router = useRouter();
+interface EditorEmptyStateProps {
+  /** When provided, bypasses default navigation and calls this callback instead */
+  onFileSelect?: (file: File) => void;
+  /** Maximum file size in megabytes (default: 100) */
+  maxFileSizeMB?: number;
+}
+
+export function EditorEmptyState({
+  onFileSelect,
+  maxFileSizeMB = MAX_FILE_SIZE_MB,
+}: EditorEmptyStateProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [fileSizeError, setFileSizeError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropzoneRef = useRef<HTMLDivElement>(null);
   const dragCounterRef = useRef(0);
+
+  const maxFileSizeBytes = maxFileSizeMB * 1024 * 1024;
 
   const handleFiles = useCallback(
     async (files: FileList | File[]) => {
@@ -33,58 +38,19 @@ export function EditorEmptyState() {
 
       if (pdfFiles.length === 0) return;
 
-      const oversizedFiles = pdfFiles.filter(
-        (f) => f.size > MAX_FILE_SIZE_BYTES
-      );
+      const oversizedFiles = pdfFiles.filter((f) => f.size > maxFileSizeBytes);
       if (oversizedFiles.length > 0) {
-        setFileSizeError(
-          `File is too large. Maximum size is ${MAX_FILE_SIZE_MB}MB.`
-        );
+        setFileSizeError(`File is too large. Maximum size is ${maxFileSizeMB}MB.`);
         return;
       }
 
       const file = pdfFiles[0];
 
-      try {
-        const sessionId = generateSessionId();
-
-        // Capture dropzone position for transition animation
-        const rect = dropzoneRef.current?.getBoundingClientRect();
-        const transitionState: TransitionState = {
-          fromHomepage: true,
-          dialogRect: rect
-            ? {
-                width: rect.width,
-                height: rect.height,
-                centerX: rect.left + rect.width / 2,
-                centerY: rect.top + rect.height / 2,
-              }
-            : null,
-          timestamp: Date.now(),
-        };
-        sessionStorage.setItem("transitionState", JSON.stringify(transitionState));
-
-        // Start exit animation
-        setIsTransitioning(true);
-
-        const bytes = await file.arrayBuffer();
-
-        await savePendingPdf({
-          sessionId,
-          name: file.name,
-          bytes: new Uint8Array(bytes),
-        });
-
-        // Delay navigation to allow exit animation to play
-        setTimeout(() => {
-          router.push(`/editor/${sessionId}`);
-        }, 300);
-      } catch (error) {
-        console.error("Failed to process PDF:", error);
-        setIsTransitioning(false);
+      if (onFileSelect) {
+        onFileSelect(file);
       }
     },
-    [router]
+    [onFileSelect, maxFileSizeBytes, maxFileSizeMB]
   );
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
