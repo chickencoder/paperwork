@@ -4,6 +4,27 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPTransport } from "@hono/mcp";
 import { readFileSync, existsSync } from "fs";
 import { fileURLToPath } from "url";
+import { randomUUID } from "crypto";
+
+// Temporary PDF storage (in-memory with expiry)
+interface StoredPDF {
+  data: Buffer;
+  filename: string;
+  expiresAt: number;
+}
+
+const pdfStore = new Map<string, StoredPDF>();
+const PDF_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
+
+// Clean up expired PDFs periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, pdf] of pdfStore.entries()) {
+    if (pdf.expiresAt < now) {
+      pdfStore.delete(id);
+    }
+  }
+}, 60 * 1000); // Check every minute
 
 // Widget HTML - bundled at build time or fetched from URL
 const WIDGET_URI = "ui://paperwork/editor.html";
@@ -18,7 +39,8 @@ function getWidgetHTML(): string {
   // In development, read from the @paperwork/widget package
   try {
     // Resolve the widget package path using import.meta.resolve
-    const widgetHtmlUrl = import.meta.resolve("@paperwork/widget/dist/index.html");
+    const widgetHtmlUrl = import.meta
+      .resolve("@paperwork/widget/dist/index.html");
     const widgetPath = fileURLToPath(widgetHtmlUrl);
     if (existsSync(widgetPath)) {
       return readFileSync(widgetPath, "utf-8");
@@ -151,6 +173,67 @@ app.get("/", (c) => {
     status: "ok",
     name: "paperwork-pdf",
     version: "1.0.0",
+  });
+});
+
+// PDF Upload endpoint - receives base64 PDF data, returns download URL
+app.post("/pdf", async (c) => {
+  try {
+    const body = await c.req.json();
+    const { data, filename } = body as { data: string; filename: string };
+
+    if (!data || !filename) {
+      return c.json({ error: "Missing data or filename" }, 400);
+    }
+
+    // Decode base64 data
+    const pdfBuffer = Buffer.from(data, "base64");
+
+    // Generate unique ID and store
+    const id = randomUUID();
+    pdfStore.set(id, {
+      data: pdfBuffer,
+      filename,
+      expiresAt: Date.now() + PDF_EXPIRY_MS,
+    });
+
+    // Build download URL based on request origin
+    const host = c.req.header("host") || "localhost:3001";
+    const protocol = c.req.header("x-forwarded-proto") || "http";
+    const downloadUrl = `${protocol}://${host}/pdf/${id}`;
+
+    return c.json({ downloadUrl, id, expiresIn: PDF_EXPIRY_MS / 1000 });
+  } catch (error) {
+    console.error("PDF upload error:", error);
+    return c.json({ error: "Failed to process PDF" }, 500);
+  }
+});
+
+// PDF Download endpoint - serves the stored PDF
+app.get("/pdf/:id", (c) => {
+  const id = c.req.param("id");
+  const stored = pdfStore.get(id);
+
+  if (!stored) {
+    return c.json({ error: "PDF not found or expired" }, 404);
+  }
+
+  // Check if expired
+  if (stored.expiresAt < Date.now()) {
+    pdfStore.delete(id);
+    return c.json({ error: "PDF expired" }, 410);
+  }
+
+  // Delete after download (one-time use)
+  pdfStore.delete(id);
+
+  // Return PDF as download
+  return new Response(stored.data, {
+    headers: {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="${stored.filename}"`,
+      "Content-Length": stored.data.length.toString(),
+    },
   });
 });
 

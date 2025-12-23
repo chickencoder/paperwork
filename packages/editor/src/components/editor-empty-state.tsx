@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { Upload } from "lucide-react";
+import { FileUp } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@paperwork/ui/button";
 
@@ -111,7 +111,7 @@ export function EditorEmptyState({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
-          className="min-h-screen p-4 bg-background"
+          className="h-full p-4 bg-background"
         >
           <motion.div
             ref={dropzoneRef}
@@ -119,13 +119,15 @@ export function EditorEmptyState({
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 1.02 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
+            onClick={handleClick}
             className={`
-              h-full min-h-[calc(100vh-2rem)] flex items-center justify-center
-              rounded-lg border-2 border-dashed transition-colors duration-200
+              h-full flex flex-col items-center justify-center
+              rounded-xl border-2 border-dashed cursor-pointer
+              transition-all duration-200 ease-out
               ${
                 isDragOver
-                  ? "border-primary bg-primary/5"
-                  : "border-muted-foreground/20"
+                  ? "border-primary bg-primary/10 scale-[1.01]"
+                  : "border-border bg-muted/30 hover:border-muted-foreground/40 hover:bg-muted/50"
               }
             `}
             onDragEnter={handleDragEnter}
@@ -138,7 +140,7 @@ export function EditorEmptyState({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
               transition={{ delay: 0.1, duration: 0.3 }}
-              className="text-center"
+              className="flex flex-col items-center gap-4 px-6 text-center"
             >
               <input
                 ref={fileInputRef}
@@ -148,15 +150,48 @@ export function EditorEmptyState({
                 onChange={handleFileInputChange}
                 aria-hidden="true"
               />
-              <Button size="lg" className="text-lg !px-12 !py-7" onClick={handleClick}>
-                <Upload className="w-5 h-5" />
-                {isDragOver ? "Drop to open" : "Upload a PDF"}
+
+              {/* Upload icon */}
+              <motion.div
+                animate={isDragOver ? { scale: 1.1, y: -4 } : { scale: 1, y: 0 }}
+                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                className={`
+                  p-4 rounded-2xl transition-colors duration-200
+                  ${isDragOver ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"}
+                `}
+              >
+                <FileUp className="w-10 h-10" strokeWidth={1.5} />
+              </motion.div>
+
+              {/* Title and description */}
+              <div className="space-y-1.5">
+                <h3 className={`text-lg font-medium transition-colors duration-200 ${isDragOver ? "text-primary" : "text-foreground"}`}>
+                  {isDragOver ? "Drop your PDF here" : "Drop PDF here"}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  or click anywhere to browse
+                </p>
+              </div>
+
+              {/* Upload button */}
+              <Button
+                size="lg"
+                className="mt-2"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleClick();
+                }}
+              >
+                <FileUp className="w-4 h-4" />
+                Choose file
               </Button>
+
+              {/* Error or file size info */}
               {fileSizeError ? (
-                <p className="text-xs text-destructive mt-3">{fileSizeError}</p>
+                <p className="text-xs text-destructive mt-1">{fileSizeError}</p>
               ) : (
-                <p className="text-xs text-muted-foreground mt-3">
-                  or drag and drop anywhere
+                <p className="text-xs text-muted-foreground/70 mt-1">
+                  PDF files up to {maxFileSizeMB}MB
                 </p>
               )}
             </motion.div>

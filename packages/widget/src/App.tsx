@@ -1,9 +1,11 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { NuqsAdapter } from "nuqs/adapters/react";
 import { Pencil } from "lucide-react";
-import { useTheme, useDisplayMode, useMaxHeight, useSendFollowUpMessage } from "./hooks/use-openai";
-import { usePDFMetadata } from "./hooks/use-pdf-metadata";
+import { useTheme, useDisplayMode, useNotifyIntrinsicHeight, useOpenExternal, useIsInChatGPT } from "./hooks/use-openai";
 import { EditorEmptyState, PDFEditor } from "@paperwork/editor";
+
+// MCP server URL for PDF downloads
+const MCP_SERVER_URL = import.meta.env.VITE_MCP_SERVER_URL || "https://mcp.paperwork.ing";
 
 function EditButton({ onClick }: { onClick: () => void }) {
   return (
@@ -17,53 +19,80 @@ function EditButton({ onClick }: { onClick: () => void }) {
   );
 }
 
+// Heights for inline mode
+const UPLOAD_SCREEN_HEIGHT = 500;
+const EDITOR_INLINE_HEIGHT = 500;
+
 function AppContent() {
   const theme = useTheme();
   const { isFullscreen, requestDisplayMode } = useDisplayMode();
-  const maxHeight = useMaxHeight();
   const [file, setFile] = useState<File | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const { summary } = usePDFMetadata(file);
-  const sendFollowUp = useSendFollowUpMessage();
-  const metadataSentRef = useRef(false);
+  const notifyIntrinsicHeight = useNotifyIntrinsicHeight();
+  const openExternal = useOpenExternal();
+  const isInChatGPT = useIsInChatGPT();
+
+  // Editing mode is simply: we're in fullscreen
+  // When ChatGPT closes fullscreen, isFullscreen becomes false, and we exit editing mode
+  const isEditing = isFullscreen;
+
+  // Custom download handler for ChatGPT widget sandbox
+  // Uploads PDF to MCP server and opens download URL externally
+  const handleDownload = useCallback(async (pdfBytes: Uint8Array, filename: string) => {
+    // Convert bytes to base64
+    const base64 = btoa(
+      Array.from(pdfBytes)
+        .map((byte) => String.fromCharCode(byte))
+        .join("")
+    );
+
+    // Upload to MCP server
+    const response = await fetch(`${MCP_SERVER_URL}/pdf`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data: base64, filename }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to upload PDF for download");
+    }
+
+    const { downloadUrl } = await response.json();
+
+    // Open the download URL (will trigger browser download)
+    openExternal(downloadUrl);
+  }, [openExternal]);
 
   // Apply theme class
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
   }, [theme]);
 
-  // Send metadata to ChatGPT when PDF is loaded
+  // Notify ChatGPT of intrinsic height and apply height constraints
   useEffect(() => {
-    if (summary && !metadataSentRef.current) {
-      metadataSentRef.current = true;
-      sendFollowUp(summary);
-    }
-  }, [summary, sendFollowUp]);
+    const root = document.getElementById("root");
 
-  // Reset state when file changes
-  useEffect(() => {
-    if (!file) {
-      metadataSentRef.current = false;
-      setIsEditing(false);
+    if (isFullscreen) {
+      // Fullscreen: use viewport height
+      document.documentElement.style.height = "100vh";
+      document.documentElement.style.overflow = "auto";
+      document.body.style.height = "100%";
+      if (root) root.style.height = "100%";
+    } else if (!file) {
+      // Upload screen: fixed height, no scroll
+      document.documentElement.style.height = `${UPLOAD_SCREEN_HEIGHT}px`;
+      document.documentElement.style.overflow = "hidden";
+      document.body.style.height = `${UPLOAD_SCREEN_HEIGHT}px`;
+      if (root) root.style.height = `${UPLOAD_SCREEN_HEIGHT}px`;
+      notifyIntrinsicHeight(UPLOAD_SCREEN_HEIGHT);
+    } else {
+      // PDF viewer inline: fixed height, no scroll
+      document.documentElement.style.height = `${EDITOR_INLINE_HEIGHT}px`;
+      document.documentElement.style.overflow = "hidden";
+      document.body.style.height = `${EDITOR_INLINE_HEIGHT}px`;
+      if (root) root.style.height = `${EDITOR_INLINE_HEIGHT}px`;
+      notifyIntrinsicHeight(EDITOR_INLINE_HEIGHT);
     }
-  }, [file]);
 
-  // Exit editing mode when leaving fullscreen
-  useEffect(() => {
-    if (!isFullscreen) {
-      setIsEditing(false);
-    }
-  }, [isFullscreen]);
-
-  // Apply height constraint to html element so window scrolling works correctly
-  useEffect(() => {
-    const inlineMaxHeight = 500;
-    const height = isFullscreen
-      ? "100vh"
-      : `${Math.min(maxHeight ?? inlineMaxHeight, inlineMaxHeight)}px`;
-    document.documentElement.style.height = height;
-    document.documentElement.style.overflow = "auto";
-    document.body.style.height = "100%";
     document.body.style.minHeight = "unset";
 
     return () => {
@@ -71,12 +100,12 @@ function AppContent() {
       document.documentElement.style.overflow = "";
       document.body.style.height = "";
       document.body.style.minHeight = "";
+      if (root) root.style.height = "";
     };
-  }, [isFullscreen, maxHeight]);
+  }, [isFullscreen, file, notifyIntrinsicHeight]);
 
-  // Handle edit button click - go fullscreen and enable editing
+  // Handle edit button click - go fullscreen (which enables editing)
   const handleEditClick = async () => {
-    setIsEditing(true);
     await requestDisplayMode("fullscreen");
   };
 
@@ -90,15 +119,19 @@ function AppContent() {
   const showEditButton = !isEditing;
 
   return (
-    <>
+    <div
+      className="overflow-auto"
+      style={{ height: isFullscreen ? "100vh" : `${EDITOR_INLINE_HEIGHT}px` }}
+    >
       {showEditButton && <EditButton onClick={handleEditClick} />}
       <PDFEditor
         file={file}
         hasTabBar={false}
         disableMicroApps={true}
         hideToolbar={!isEditing}
+        onDownload={isInChatGPT ? handleDownload : undefined}
       />
-    </>
+    </div>
   );
 }
 

@@ -29,6 +29,7 @@ export interface OpenAIWidget {
   uploadFile: (file: File) => Promise<{ file_id: string; download_url: string }>;
   getFileDownloadUrl: (options: { fileId: string }) => Promise<string>;
   notifyIntrinsicHeight: (height: number) => void;
+  openExternal: (options: { href: string }) => void;
 }
 
 // Tool output structure from MCP tools

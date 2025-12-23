@@ -50,6 +50,8 @@ interface PDFEditorProps {
   isEntering?: boolean;
   entryRect?: TransitionState["dialogRect"];
   onEnterComplete?: () => void;
+  /** Custom download handler - if provided, replaces the default browser download */
+  onDownload?: (pdfBytes: Uint8Array, filename: string) => Promise<void>;
 }
 
 export function PDFEditor({
@@ -65,6 +67,7 @@ export function PDFEditor({
   isEntering = false,
   entryRect,
   onEnterComplete,
+  onDownload: customDownloadHandler,
 }: PDFEditorProps) {
   const {
     state,
@@ -520,11 +523,20 @@ export function PDFEditor({
         suffix = "_flattened.pdf";
       }
 
+      const filename = file.name.replace(".pdf", suffix);
+
+      // Use custom download handler if provided (for widget sandbox)
+      if (customDownloadHandler) {
+        await customDownloadHandler(new Uint8Array(modifiedBytes), filename);
+        return;
+      }
+
+      // Default browser download
       const blob = new Blob([new Uint8Array(modifiedBytes)], { type: "application/pdf" });
       url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = file.name.replace(".pdf", suffix);
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -537,7 +549,7 @@ export function PDFEditor({
         URL.revokeObjectURL(url);
       }
     }
-  }, [state.pdfBytes, state.textAnnotations, state.signatureAnnotations, state.highlightAnnotations, state.strikethroughAnnotations, state.redactionAnnotations, state.shapeAnnotations, file.name]);
+  }, [state.pdfBytes, state.textAnnotations, state.signatureAnnotations, state.highlightAnnotations, state.strikethroughAnnotations, state.redactionAnnotations, state.shapeAnnotations, file.name, customDownloadHandler]);
 
   // Check if there are any enabled redactions
   const hasRedactions = state.redactionAnnotations.some(r => r.enabled);

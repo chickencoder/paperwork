@@ -154,27 +154,53 @@ export function useGetFileDownloadUrl() {
  */
 export function useDisplayMode() {
   const openai = useOpenAI();
-  const sdkDisplayMode = openai?.displayMode;
 
-  // Track local state for immediate UI response (and fallback when SDK unavailable)
-  const [localFullscreen, setLocalFullscreen] = useState(false);
+  // Track actual fullscreen state (not optimistic - waits for ChatGPT)
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  // Track if we've requested fullscreen and are waiting for it
+  const [pendingFullscreen, setPendingFullscreen] = useState(false);
 
-  // Sync local state with SDK when available
+  // Poll for display mode changes since the SDK may not fire events consistently
   useEffect(() => {
-    if (sdkDisplayMode !== undefined) {
-      setLocalFullscreen(sdkDisplayMode === "fullscreen");
-    }
-  }, [sdkDisplayMode]);
+    // Poll when we're fullscreen (to detect exit) or when we're waiting for fullscreen
+    if (!isFullscreen && !pendingFullscreen) return;
 
-  const displayMode = sdkDisplayMode ?? (localFullscreen ? "fullscreen" : "inline");
+    const checkDisplayMode = () => {
+      const currentMode = window.openai?.displayMode;
+      if (currentMode === "fullscreen" && pendingFullscreen) {
+        // ChatGPT entered fullscreen - now show editing UI
+        setPendingFullscreen(false);
+        setIsFullscreen(true);
+      } else if (currentMode === "inline" && isFullscreen) {
+        // ChatGPT closed fullscreen - reset our state
+        setIsFullscreen(false);
+      }
+    };
+
+    // Check frequently for responsive feel
+    const interval = setInterval(checkDisplayMode, 100);
+    return () => clearInterval(interval);
+  }, [isFullscreen, pendingFullscreen]);
+
+  // Use actual fullscreen state (not optimistic)
+  const displayMode = isFullscreen ? "fullscreen" : "inline";
 
   const requestDisplayMode = useCallback(
     async (mode: "inline" | "pip" | "fullscreen") => {
-      // Update local state immediately for responsive UI
-      setLocalFullscreen(mode === "fullscreen");
+      if (mode === "fullscreen") {
+        // Don't set fullscreen yet - wait for ChatGPT to confirm
+        setPendingFullscreen(true);
+      } else {
+        setIsFullscreen(false);
+        setPendingFullscreen(false);
+      }
 
       if (!openai?.requestDisplayMode) {
-        // Fallback: just use local state when SDK unavailable
+        // Fallback for local dev: just set it directly
+        if (mode === "fullscreen") {
+          setPendingFullscreen(false);
+          setIsFullscreen(true);
+        }
         return;
       }
       await openai.requestDisplayMode({ mode });
@@ -219,4 +245,50 @@ export function useSendFollowUpMessage() {
     },
     [openai]
   );
+}
+
+/**
+ * Hook to notify ChatGPT of the widget's intrinsic height
+ * Call this when your widget content changes size
+ */
+export function useNotifyIntrinsicHeight() {
+  const openai = useOpenAI();
+
+  return useCallback(
+    (height: number) => {
+      if (!openai?.notifyIntrinsicHeight) {
+        return;
+      }
+      openai.notifyIntrinsicHeight(height);
+    },
+    [openai]
+  );
+}
+
+/**
+ * Hook to open external URLs in the user's browser
+ * Use this for downloads or external links that can't be handled in the sandbox
+ */
+export function useOpenExternal() {
+  const openai = useOpenAI();
+
+  return useCallback(
+    (href: string) => {
+      if (!openai?.openExternal) {
+        // Fallback: try to open in a new window (may be blocked by sandbox)
+        window.open(href, "_blank");
+        return;
+      }
+      openai.openExternal({ href });
+    },
+    [openai]
+  );
+}
+
+/**
+ * Check if we're running inside the ChatGPT widget sandbox
+ */
+export function useIsInChatGPT(): boolean {
+  const openai = useOpenAI();
+  return openai !== undefined;
 }
